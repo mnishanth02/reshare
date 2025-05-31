@@ -5,7 +5,7 @@ const Footer = () => {
         <div className="pt-5 text-center text-sm">
           <p className="text-xs">Build with ❤️ by Nishanth Murugan</p>
           <p className="text-muted-foreground text-xs">
-            © {new Date().getFullYear()} Nextjs Starter. All rights reserved.
+            © {new Date().getFullYear()} ReShare. All rights reserved.
           </p>
         </div>
       </div>

@@ -26,8 +26,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Nextjs Starter",
-    template: "%s | Nextjs Starter",
+    default: "ReShare",
+    template: "%s | ReShare",
   },
   icons: [
     {
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
       type: "image/x-icon",
     },
   ],
-  description: "Nextjs Starter",
+  description: "ReShare",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   alternates: {
     canonical: "/",
@@ -44,22 +44,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: "/",
-    siteName: "Nextjs Starter",
-    title: "Nextjs Starter",
-    description: "Nextjs Starter",
+    siteName: "ReShare",
+    title: "ReShare",
+    description: "ReShare",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Nextjs Starter",
+        alt: "ReShare",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nextjs Starter",
-    description: "Nextjs Starter",
+    title: "ReShare",
+    description: "ReShare",
     images: ["/og-image.jpg"],
   },
   robots: {
