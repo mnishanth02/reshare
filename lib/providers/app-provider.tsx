@@ -1,6 +1,7 @@
 "use client";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ClerkProvider } from "@clerk/nextjs";
 import NextTopLoader from "nextjs-toploader";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import type { ReactNode } from "react";
@@ -15,7 +16,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showSpinner={false}
       />
       <TooltipProvider>
-        <NuqsAdapter>{children}</NuqsAdapter>
+        <ClerkProvider>
+          <NuqsAdapter>{children}</NuqsAdapter>
+        </ClerkProvider>
       </TooltipProvider>
       <Toaster
         position="bottom-right"
