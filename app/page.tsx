@@ -1,15 +1,19 @@
-import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-
+"use client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SignInButton, UserButton } from "@clerk/nextjs";
+import { AuthLoading, Authenticated, Unauthenticated } from "convex/react";
 export default function Home() {
   return (
     <header className="flex justify-end items-center p-4 gap-4 h-16">
-      <SignedOut>
+      <Unauthenticated>
         <SignInButton />
-        <SignUpButton />
-      </SignedOut>
-      <SignedIn>
+      </Unauthenticated>
+      <Authenticated>
         <UserButton />
-      </SignedIn>
+      </Authenticated>
+      <AuthLoading>
+        <Skeleton className="h-8 w-8 rounded-full" />
+      </AuthLoading>
     </header>
   );
 }

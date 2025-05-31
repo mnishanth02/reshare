@@ -21,7 +21,9 @@
     "paths": {
       "@/*": ["./*"],
       "@ui/*": ["./components/ui/*"],
-      "@config/*": ["./lib/config/*"]
+      "@config/*": ["./lib/config/*"],
+      "@env/*": ["./env/*"],
+      "@convex/*": ["./convex/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

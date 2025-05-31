@@ -91,8 +91,8 @@ export default function RootLayout({ children, modal }: RootLayoutProps) {
       <body className="flex min-h-screen flex-col antialiased">
         <AppProvider>
           <main className="grow">{children}</main>
-          {modal}
         </AppProvider>
+        {modal}
       </body>
     </html>
   );
