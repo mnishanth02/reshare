@@ -1,0 +1,89 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git"
+  },
+  "files": {
+    "ignore": [
+      "**/node_modules",
+      "**/dist",
+      "**/build",
+      "**/public",
+      "**/.turbo",
+      "**/.next",
+      "**/.vercel",
+      "**/coverage",
+      "**/.husky",
+      "**/.vscode",
+      "**/drizzle/migrations",
+      "**/convex/_generated/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "ignore": [
+      "**/node_modules",
+      "**/dist",
+      "**/build",
+      "**/public",
+      "**/.turbo",
+      "**/.next",
+      "**/.vercel",
+      "**/coverage",
+      "**/.husky",
+      "**/.vscode",
+      "**/drizzle/migrations",
+      "**/convex/_generated/**"
+    ]
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": {
+        "noAriaUnsupportedElements": "warn",
+        "noBlankTarget": "error",
+        "useAltText": "warn",
+        "useAriaPropsForRole": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "error",
+        "useJsxKeyInIterable": "error",
+        "noUnusedImports": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtmlWithChildren": "error"
+      },
+      "style": {
+        "noVar": "error",
+        "useConst": "error",
+        "useTemplate": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "es5",
+      "semicolons": "always"
+    },
+    "globals": ["React"]
+  },
+  "json": {
+    "parser": {
+      "allowComments": true
+    }
+  }
+}
