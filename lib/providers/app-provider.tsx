@@ -16,7 +16,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         shadow="0 0 10px #d34936,0 0 5px #d34936"
         showSpinner={false}
       />
-      <ClerkProvider>
+      <ClerkProvider dynamic>
         <TooltipProvider>
           <NuqsAdapter>
             <ConvexClientProvider>{children}</ConvexClientProvider>
