@@ -57,26 +57,26 @@
 **Estimated Time**: 4-5 days
 
 **Tasks:**
-- [ ] **Convex Schema Implementation**
-  - Implement complete database schema from reference
-  - Set up all tables: users, journeys, activities, exports, etc.
-  - Configure indexes for optimal query performance
-  - Add data validation with Zod schemas
-  - Set up database migrations system
+- [x] **Convex Schema Implementation**
+  - [x] Implement complete database schema from reference
+  - [x] Set up all tables: users, journeys, activities, exports, etc.
+  - [x] Configure indexes for optimal query performance
+  - [x] Add data validation with Zod schemas
+  - [x] Set up database migrations system
 
-- [ ] **Authentication Integration**
-  - Complete Clerk integration with Convex
-  - Implement user profile management
-  - Set up protected routes middleware
-  - Configure session management
-  - Add user onboarding flows
+- [x] **Authentication Integration**
+  - [x] Complete Clerk integration with Convex
+  - [x] Implement user profile management
+  - [x] Set up protected routes middleware
+  - [x] Configure session management
+  - [x] Add user onboarding flows
 
 - [ ] **Core Utility Functions**
-  - Implement GPX processing utilities
-  - Add geospatial calculation functions
-  - Create route simplification algorithms
-  - Set up error handling and logging
-  - Add performance monitoring
+  - [ ] Implement GPX processing utilities
+  - [ ] Add geospatial calculation functions
+  - [ ] Create route simplification algorithms
+  - [ ] Set up error handling and logging
+  - [ ] Add performance monitoring
 
 **Deliverables:**
 - Fully functional backend with all schemas
