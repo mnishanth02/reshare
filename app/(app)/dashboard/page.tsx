@@ -1,25 +1,29 @@
 "use client";
 
-import {
-  type FilterState,
-  JourneyFilters,
-  JourneyList,
-  JourneySearch,
-  JourneySort,
-} from "@/components/dashboard";
-import { DashboardSkeleton } from "@/components/dashboard/journey-skeleton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { ACTIVITY_TYPES } from "@/lib/constants";
-import { usePaginatedQuery } from "convex/react";
+import { useMutation, usePaginatedQuery } from "convex/react";
 import { Plus } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { parseAsString, parseAsStringEnum, useQueryState } from "nuqs";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
+
+import { JourneyFilters } from "@/components/dashboard/journey-filters";
+import type { FilterState } from "@/components/dashboard/journey-filters";
+// Import components
+import { JourneyList } from "@/components/dashboard/journey-list";
+import { JourneySearch } from "@/components/dashboard/journey-search";
+import { DashboardSkeleton } from "@/components/dashboard/journey-skeleton";
+import { JourneySort } from "@/components/dashboard/journey-sort";
+
+type SortBy = "createdAt" | "updatedAt" | "title" | "totalDistance";
+type SortOrder = "asc" | "desc";
 
 // Define URL query parameter parsers
-const sortOrderParser = parseAsStringEnum(["asc", "desc"] as const);
-const sortByParser = parseAsStringEnum([
+const sortOrderParser = parseAsStringEnum<SortOrder>(["asc", "desc"] as const);
+const sortByParser = parseAsStringEnum<SortBy>([
   "createdAt",
   "updatedAt",
   "title",
@@ -44,9 +48,11 @@ export default function DashboardPage() {
 
   const [filters, setFilters] = useQueryState("filters", filterParser);
 
-  const [sortBy, setSortBy] = useQueryState("sort", sortByParser.withDefault("updatedAt"));
-
-  const [sortOrder, setSortOrder] = useQueryState("order", sortOrderParser.withDefault("desc"));
+  const [sortBy, setSortBy] = useQueryState<SortBy>("sort", sortByParser.withDefault("updatedAt"));
+  const [sortOrder, setSortOrder] = useQueryState<SortOrder>(
+    "order",
+    sortOrderParser.withDefault("desc")
+  );
 
   // Ensure we have a valid FilterState object
   const safeFilters = filters || {};
@@ -99,9 +105,41 @@ export default function DashboardPage() {
     [setSortBy, setSortOrder]
   );
 
+  const router = useRouter();
+  const createJourney = useMutation(api.journeys.mutations.create);
+  const [isCreating, setIsCreating] = useState(false);
+
   const handleLoadMore = useCallback(() => {
     loadMore(12);
   }, [loadMore]);
+
+  const handleCreateJourney = useCallback(async () => {
+    if (isCreating) return;
+
+    setIsCreating(true);
+    const toastId = toast.loading("Creating your journey...");
+
+    try {
+      const journeyId = await createJourney({
+        title: "Untitled Journey",
+        description: "",
+        visibility: "private",
+        defaultMapStyle: "outdoors",
+        defaultActivityType: "hike",
+        defaultColorPalette: "blue",
+      });
+
+      toast.success("Journey created!", { id: toastId });
+      router.push(`/journey/${journeyId}`);
+      // return journeyId;
+    } catch (error) {
+      console.error("Error creating journey:", error);
+      toast.error("Failed to create journey. Please try again.", { id: toastId });
+      throw error;
+    } finally {
+      setIsCreating(false);
+    }
+  }, [createJourney, router, isCreating]);
 
   const journeys = results || [];
   const hasMore = status === "CanLoadMore";
@@ -116,18 +154,29 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight">My Journeys</h1>
           <p className="text-muted-foreground mt-2">Manage and explore your outdoor adventures</p>
         </div>
-        <Link href="/journey/new" hidden={noJourneys}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Journey
-          </Button>
-        </Link>
+        <Button
+          onClick={handleCreateJourney}
+          disabled={isCreating || isLoadingFirstPage}
+          className="inline-flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          {isCreating ? "Creating..." : "New Journey"}
+        </Button>
       </div>
 
       {isLoadingFirstPage ? (
         <DashboardSkeleton />
       ) : noJourneys ? (
-        <EmptyState />
+        <div className="text-center py-12 border-2 border-dashed border-muted rounded-lg">
+          <h2 className="text-2xl font-semibold mb-3">No Journeys Yet!</h2>
+          <p className="text-muted-foreground mb-6">
+            It looks like you haven't created any journeys. Start your adventure now!
+          </p>
+          <Button onClick={handleCreateJourney} disabled={isCreating} className="gap-2">
+            <Plus className="h-4 w-4" />
+            {isCreating ? "Creating..." : "Create Your First Journey"}
+          </Button>
+        </div>
       ) : (
         <>
           <div className="space-y-4">
@@ -169,18 +218,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-const EmptyState = () => (
-  <div className="text-center py-12 border-2 border-dashed border-muted rounded-lg">
-    <h2 className="text-2xl font-semibold mb-3">No Journeys Yet!</h2>
-    <p className="text-muted-foreground mb-6">
-      It looks like you haven't created any journeys. Start your adventure now!
-    </p>
-    <Link href="/journey/new">
-      <Button size="lg">
-        <Plus className="h-5 w-5 mr-2" />
-        Create Your First Journey
-      </Button>
-    </Link>
-  </div>
-);

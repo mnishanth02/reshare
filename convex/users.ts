@@ -157,14 +157,16 @@ export async function getCurrentUser(ctx: QueryCtx) {
   if (identity === null) {
     return null;
   }
-  return await userByTokenIdentifier(ctx, identity.tokenIdentifier);
+  return await userByTokenIdentifier(ctx, identity.subject);
 }
 
 async function userByTokenIdentifier(ctx: QueryCtx, tokenIdentifier: string) {
-  return await ctx.db
+  const user = await ctx.db
     .query("users")
     .withIndex("by_token_identifier", (q) => q.eq("tokenIdentifier", tokenIdentifier))
     .unique();
+
+  return user;
 }
 
 // current exposes the user information to the client, which will helps the client determine whether the webhook already succeeded
