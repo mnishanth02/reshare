@@ -1,0 +1,21 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "bun" # Or "yarn" or "pnpm" if you use those
+    directory: "/" # Location of your package.json
+    schedule:
+      interval: "weekly" # Check for updates weekly (other options: daily, monthly)
+    # Optional: You can add more configurations here
+    # For example, to ignore major updates for a specific package:
+    # ignore:
+    #   - dependency-name: "next"
+    #     update-types: ["version-update:semver-major"]
+    #
+    # Or to group updates for better PR management:
+    # groups:
+    #   nextjs-related:
+    #     patterns:
+    #       - "next"
+    #       - "@next/*"
+    #   dev-dependencies:
+    #     dependency-type: "development"
