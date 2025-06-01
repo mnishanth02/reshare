@@ -1,7 +1,8 @@
 {
   "workbench.editor.customLabels.patterns": {
     "**/app/**/page.tsx": "${dirname} - page.tsx",
-    "**/app/**/layout.tsx": "${dirname} - layout.tsx"
+    "**/app/**/layout.tsx": "${dirname} - layout.tsx",
+    "**/components/**/index.tsx": "${dirname} - index.tsx"
   },
 
   "editor.defaultFormatter": "biomejs.biome",

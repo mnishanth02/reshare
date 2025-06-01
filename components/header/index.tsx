@@ -10,13 +10,15 @@ export default function Header() {
   return (
     <header className="top-0 w-full border-b z-30 backdrop-blur ">
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center p-0 m-0 rounded-full">
           <Image
-            src={"/logos/logo.png"}
-            alt="Vehiql Logo"
+            src={"/images/logo-xl.png"}
+            alt="ReShare Logo"
             width={200}
             height={60}
-            className="h-11 w-auto object-contain"
+            className="h-16 rounded-full w-auto object-contain"
+            priority
+            loading="eager"
           />
         </Link>
 
