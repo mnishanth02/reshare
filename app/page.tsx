@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { AuthLoading, Authenticated, Unauthenticated } from "convex/react";
+import { useRouter } from "next/navigation";
 export default function Home() {
+  const router = useRouter();
   return (
     <>
-      <header className="flex justify-end items-center p-4 gap-4 h-16">
+      <div className="flex justify-end items-center p-4 gap-4 h-16">
         <Unauthenticated>
           <SignInButton />
         </Unauthenticated>
@@ -16,9 +18,9 @@ export default function Home() {
         <AuthLoading>
           <Skeleton className="h-8 w-8 rounded-full" />
         </AuthLoading>
-      </header>
+      </div>
 
-      <Button>Test button </Button>
+      <Button onClick={() => router.push("/dashboard")}>Dashboard </Button>
     </>
   );
 }
