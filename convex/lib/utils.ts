@@ -1,7 +1,4 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import type {
   ActivityPoint,
   ActivityStats,
@@ -13,11 +10,7 @@ import type {
   GPXData,
   RouteSimplificationOptions,
   SpeedProfile,
-} from "@convex/lib";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+} from "./types";
 
 // ============================================================================
 // Constants
