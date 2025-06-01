@@ -30,6 +30,7 @@ export const ACTIVITY_TYPES = {
   SAILING: "sailing",
   MOTORCYCLE: "motorcycle",
   DRIVING: "driving",
+  TRAVELING: "traveling",
   OTHER: "other",
 } as const;
 
@@ -45,6 +46,7 @@ export const ACTIVITY_TYPE_LABELS = {
   [ACTIVITY_TYPES.SAILING]: "Sailing",
   [ACTIVITY_TYPES.MOTORCYCLE]: "Motorcycle",
   [ACTIVITY_TYPES.DRIVING]: "Driving",
+  [ACTIVITY_TYPES.TRAVELING]: "Traveling",
   [ACTIVITY_TYPES.OTHER]: "Other",
 } as const;
 

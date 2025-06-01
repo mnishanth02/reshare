@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { env } from "@/env/client-env";
 import { AppProvider } from "@/lib/providers";
 
 const inter = Inter({
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
     },
   ],
   description: "ReShare",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
   alternates: {
     canonical: "/",
   },

@@ -174,7 +174,7 @@
 **Estimated Time**: 5-6 days
 
 **Tasks:**
-- [ ] **Journey Database Implementation**
+- [x] **Journey Database Implementation**
   - Implement Convex queries for journey operations
   - Create journey mutations (create, update, delete)
   - Add journey validation with Zod schemas
@@ -182,7 +182,7 @@
   - Implement journey sharing permissions
 
 - [ ] **Journey Dashboard Interface**
-  - Build responsive journey grid with cards
+  - Build responsive journey grid/list with cards
   - Implement infinite scroll for performance
   - Add search functionality with debounced queries
   - Create filter options (date, type, status)

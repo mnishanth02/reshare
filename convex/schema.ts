@@ -54,7 +54,19 @@ export default defineSchema({
     .index("by_user_status", ["userId", "status"])
     .index("by_visibility", ["visibility"])
     .index("by_created_at", ["createdAt"])
-    .index("by_updated_at", ["updatedAt"]),
+    .index("by_updated_at", ["updatedAt"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: [
+        "userId",
+        "status",
+        "defaultActivityType",
+        "visibility",
+        "createdAt",
+        "updatedAt",
+        "lastActivityDate",
+      ],
+    }),
 
   // Activities table
   activities: defineTable({

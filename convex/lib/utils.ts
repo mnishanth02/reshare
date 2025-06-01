@@ -1,3 +1,4 @@
+import { ACTIVITY_TYPES } from "../../lib/constants";
 import type { Id } from "../_generated/dataModel";
 import type {
   ActivityPoint,
@@ -21,34 +22,6 @@ export const EARTH_RADIUS_MILES = 3959;
 
 export const DEFAULT_SIMPLIFICATION_TOLERANCE = 0.0001; // ~11 meters
 export const DEFAULT_MAX_POINTS = 1000;
-
-export const ACTIVITY_TYPES = {
-  RUNNING: "running",
-  CYCLING: "cycling",
-  WALKING: "walking",
-  HIKING: "hiking",
-  SWIMMING: "swimming",
-  SKIING: "skiing",
-  OTHER: "other",
-} as const;
-
-export const MAP_STYLES = {
-  STREET: "street",
-  SATELLITE: "satellite",
-  TERRAIN: "terrain",
-  OUTDOORS: "outdoors",
-  DARK: "dark",
-  LIGHT: "light",
-} as const;
-
-export const COLOR_PALETTES = {
-  DEFAULT: "default",
-  VIBRANT: "vibrant",
-  PASTEL: "pastel",
-  MONOCHROME: "monochrome",
-  NATURE: "nature",
-  SUNSET: "sunset",
-} as const;
 
 // ============================================================================
 // Distance and Geospatial Calculations

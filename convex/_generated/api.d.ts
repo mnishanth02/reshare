@@ -14,6 +14,9 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as http from "../http.js";
+import type * as journeys_index from "../journeys/index.js";
+import type * as journeys_mutations from "../journeys/mutations.js";
+import type * as journeys_queries from "../journeys/queries.js";
 import type * as lib_index from "../lib/index.js";
 import type * as lib_types from "../lib/types.js";
 import type * as lib_utils from "../lib/utils.js";
@@ -30,6 +33,9 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   http: typeof http;
+  "journeys/index": typeof journeys_index;
+  "journeys/mutations": typeof journeys_mutations;
+  "journeys/queries": typeof journeys_queries;
   "lib/index": typeof lib_index;
   "lib/types": typeof lib_types;
   "lib/utils": typeof lib_utils;
