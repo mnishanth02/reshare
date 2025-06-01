@@ -4,15 +4,15 @@ import type { api } from "@/convex/_generated/api";
 import { type Preloaded, usePreloadedQuery } from "convex/react";
 import { Calendar, Clock, Gauge, MapPin, Mountain } from "lucide-react";
 
-interface JourneyDetailsProps {
+interface JourneyClientProps {
   preloadedJourney: Preloaded<typeof api.journeys.queries.getJourney>;
 }
 
-export function JourneyDetails({ preloadedJourney }: JourneyDetailsProps) {
+export function JourneyClient({ preloadedJourney }: JourneyClientProps) {
   const journey = usePreloadedQuery(preloadedJourney);
 
   if (journey === undefined || journey === null) {
-    return null; // Loading is handled by Suspense
+    return null;
   }
 
   const formatDate = (timestamp?: number) => {
@@ -33,8 +33,8 @@ export function JourneyDetails({ preloadedJourney }: JourneyDetailsProps) {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="space-y-6">
+    <div className="px-8 py-6">
+      <div className="space-y-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{journey.title}</h1>
           {journey.description && (

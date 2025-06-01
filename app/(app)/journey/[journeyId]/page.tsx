@@ -1,11 +1,11 @@
 "use server";
 
+import { JourneyClient } from "@/components/journey/journey-client";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { preloadQuery } from "convex/nextjs";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { JourneyDetails } from "./journey-details";
 
 interface JourneyDetailsPageProps {
   params: Promise<{ journeyId: string }>;
@@ -23,7 +23,7 @@ export default async function JourneyDetailsPage({ params }: JourneyDetailsPageP
 
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <JourneyDetails preloadedJourney={preloadedJourney} />
+      <JourneyClient preloadedJourney={preloadedJourney} />
     </Suspense>
   );
 }
