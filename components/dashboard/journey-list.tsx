@@ -80,24 +80,8 @@ export function JourneyList({
     };
   }, [hasMore, isLoading, isLoadingMore, loadMore]);
 
-  const LoadingSkeleton = () => (
-    <div
-      className={
-        viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"
-      }
-    >
-      {Array.from({ length: 6 }, (_, i) => `skeleton-${i}`).map((key) => (
-        <div key={key} className="space-y-3">
-          <Skeleton className="h-48 w-full rounded-lg" />
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
-      ))}
-    </div>
-  );
-
   if (isLoading) {
-    return <LoadingSkeleton />;
+    return <LoadingSkeleton viewMode={viewMode} />;
   }
 
   if (journeys.length === 0) {
@@ -186,3 +170,19 @@ export function JourneyList({
     </div>
   );
 }
+
+const LoadingSkeleton = ({ viewMode }: { viewMode: "grid" | "list" }) => (
+  <div
+    className={
+      viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"
+    }
+  >
+    {Array.from({ length: 6 }, (_, i) => `skeleton-${i}`).map((key) => (
+      <div key={key} className="space-y-3">
+        <Skeleton className="h-48 w-full rounded-lg" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    ))}
+  </div>
+);

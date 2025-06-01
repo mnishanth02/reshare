@@ -14,39 +14,90 @@ import { ACTIVITY_TYPES } from "@/lib/constants";
 import { usePaginatedQuery } from "convex/react";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { parseAsString, parseAsStringEnum, useQueryState } from "nuqs";
+import { useCallback } from "react";
+
+// Define URL query parameter parsers
+const sortOrderParser = parseAsStringEnum(["asc", "desc"] as const);
+const sortByParser = parseAsStringEnum([
+  "createdAt",
+  "updatedAt",
+  "title",
+  "totalDistance",
+] as const);
+
+// Define a type-safe parser for filters
+const filterParser = {
+  parse: (value: string): FilterState => {
+    try {
+      return JSON.parse(value) as FilterState;
+    } catch {
+      return {};
+    }
+  },
+  serialize: (value: FilterState): string => JSON.stringify(value),
+};
 
 export default function DashboardPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState<FilterState>({});
-  const [sortBy, setSortBy] = useState("updatedAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  // URL state for search, filters, and sorting
+  const [searchTerm, setSearchTerm] = useQueryState("q", parseAsString.withDefault(""));
 
+  const [filters, setFilters] = useQueryState("filters", filterParser);
+
+  const [sortBy, setSortBy] = useQueryState("sort", sortByParser.withDefault("updatedAt"));
+
+  const [sortOrder, setSortOrder] = useQueryState("order", sortOrderParser.withDefault("desc"));
+
+  // Ensure we have a valid FilterState object
+  const safeFilters = filters || {};
+
+  // Fetch data using the URL state
   const { results, status, loadMore } = usePaginatedQuery(
     api.journeys.queries.getUserJourneys,
     {
       searchTerm: searchTerm || undefined,
-      status: filters.status,
-      defaultActivityType: filters.defaultActivityType,
-      dateFilter: filters.dateFilter,
-      sortBy: sortBy as "createdAt" | "updatedAt" | "title" | "totalDistance",
+      status: safeFilters.status,
+      defaultActivityType: safeFilters.defaultActivityType,
+      dateFilter: safeFilters.dateFilter,
+      sortBy: sortBy,
       sortOrder,
     },
     { initialNumItems: 12 }
   );
 
-  const handleSearch = useCallback((term: string) => {
-    setSearchTerm(term);
-  }, []);
+  const handleSearch = useCallback(
+    (term: string) => {
+      void setSearchTerm(term || null); // Use null to remove the param when empty
+    },
+    [setSearchTerm]
+  );
 
-  const handleFiltersChange = useCallback((newFilters: FilterState) => {
-    setFilters(newFilters);
-  }, []);
+  const handleFiltersChange = useCallback(
+    (newFilters: FilterState) => {
+      // Remove empty filters
+      const cleanFilters = Object.entries(newFilters).reduce<FilterState>((acc, [key, value]) => {
+        if (
+          value !== undefined &&
+          value !== "" &&
+          !(value && typeof value === "object" && Object.keys(value).length === 0)
+        ) {
+          acc[key as keyof FilterState] = value;
+        }
+        return acc;
+      }, {});
 
-  const handleSortChange = useCallback((newSortBy: string, newSortOrder: "asc" | "desc") => {
-    setSortBy(newSortBy);
-    setSortOrder(newSortOrder);
-  }, []);
+      void setFilters(Object.keys(cleanFilters).length > 0 ? cleanFilters : null);
+    },
+    [setFilters]
+  );
+
+  const handleSortChange = useCallback(
+    (newSortBy: string, newSortOrder: "asc" | "desc") => {
+      void setSortBy(newSortBy as "createdAt" | "updatedAt" | "title" | "totalDistance");
+      void setSortOrder(newSortOrder);
+    },
+    [setSortBy, setSortOrder]
+  );
 
   const handleLoadMore = useCallback(() => {
     loadMore(12);
@@ -86,6 +137,7 @@ export default function DashboardPage() {
                   onSearch={handleSearch}
                   initialSearchTerm={searchTerm}
                   placeholder="Search journeys by title or description..."
+                  key={searchTerm} // Force re-render when searchTerm changes
                 />
               </div>
               <div className="flex-shrink-0">
@@ -99,8 +151,9 @@ export default function DashboardPage() {
 
             <JourneyFilters
               onFiltersChange={handleFiltersChange}
-              currentFilters={filters}
+              currentFilters={safeFilters}
               activityTypes={ACTIVITY_TYPES}
+              key={JSON.stringify(safeFilters)} // Force re-render when filters change
             />
           </div>
 

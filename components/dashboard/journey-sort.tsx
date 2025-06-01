@@ -9,12 +9,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { useEffect } from "react";
+import { useQueryState } from "nuqs";
+import { useCallback } from "react";
 
 interface JourneySortProps {
-  onSortChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
-  currentSortBy: string;
-  currentSortOrder: "asc" | "desc";
+  onSortChange?: (sortBy: string, sortOrder: "asc" | "desc") => void;
+  currentSortBy?: string;
+  currentSortOrder?: "asc" | "desc";
 }
 
 const SORT_OPTIONS = [
@@ -24,35 +25,44 @@ const SORT_OPTIONS = [
   { value: "totalDistance", label: "Distance" },
 ];
 
-export function JourneySort({ onSortChange, currentSortBy, currentSortOrder }: JourneySortProps) {
-  // Load preferences from localStorage on mount
-  useEffect(() => {
-    const savedSortBy = localStorage.getItem("journey-sort-by");
-    const savedSortOrder = localStorage.getItem("journey-sort-order") as "asc" | "desc";
+export function JourneySort({
+  onSortChange,
+  currentSortBy: propSortBy,
+  currentSortOrder: propSortOrder,
+}: JourneySortProps) {
+  // Use URL state if no props are provided
+  const [sortBy, setSortBy] = useQueryState("sort", {
+    defaultValue: propSortBy || "updatedAt",
+  });
 
-    if (
-      savedSortBy &&
-      savedSortOrder &&
-      (savedSortBy !== currentSortBy || savedSortOrder !== currentSortOrder)
-    ) {
-      onSortChange(savedSortBy, savedSortOrder);
-    }
-  }, [onSortChange, currentSortBy, currentSortOrder]);
+  const [sortOrder, setSortOrder] = useQueryState("order", {
+    defaultValue: propSortOrder || "desc",
+  });
 
-  // Save preferences to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("journey-sort-by", currentSortBy);
-    localStorage.setItem("journey-sort-order", currentSortOrder);
-  }, [currentSortBy, currentSortOrder]);
+  // If props are provided, use them instead of URL state
+  const currentSortBy = propSortBy !== undefined ? propSortBy : sortBy;
+  const currentSortOrder =
+    propSortOrder !== undefined ? propSortOrder : (sortOrder as "asc" | "desc");
 
-  const handleSortByChange = (sortBy: string) => {
-    onSortChange(sortBy, currentSortOrder);
-  };
+  const handleSortByChange = useCallback(
+    async (newSortBy: string) => {
+      if (onSortChange) {
+        onSortChange(newSortBy, currentSortOrder);
+      } else {
+        await setSortBy(newSortBy);
+      }
+    },
+    [onSortChange, currentSortOrder, setSortBy]
+  );
 
-  const handleSortOrderToggle = () => {
+  const handleSortOrderToggle = useCallback(async () => {
     const newOrder = currentSortOrder === "asc" ? "desc" : "asc";
-    onSortChange(currentSortBy, newOrder);
-  };
+    if (onSortChange) {
+      onSortChange(currentSortBy, newOrder);
+    } else {
+      await setSortOrder(newOrder);
+    }
+  }, [onSortChange, currentSortBy, currentSortOrder, setSortOrder]);
 
   const getSortIcon = () => {
     if (currentSortOrder === "asc") {
@@ -68,6 +78,11 @@ export function JourneySort({ onSortChange, currentSortBy, currentSortOrder }: J
     const option = SORT_OPTIONS.find((opt) => opt.value === currentSortBy);
     return option?.label || "Sort by";
   };
+
+  // Don't render anything if we don't have a valid sort value
+  if (!currentSortBy || !currentSortOrder) {
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-2">
