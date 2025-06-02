@@ -1,33 +1,160 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-import type { Id } from "@/convex/_generated/dataModel";
-import type {
-  ActivityPoint,
-  ActivityStats,
-  ActivitySummary,
-  BoundingBox,
-  Coordinates,
-  DistanceCalculationMethod,
-  ElevationProfile,
-  GPXData,
-  RouteSimplificationOptions,
-  SpeedProfile,
-} from "@convex/lib";
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+/**
+ * A type representing any function with typed parameters and return value
+ * @typeParam T - Tuple type representing the function arguments
+ * @typeParam R - The return type of the function
+ * @example
+ * ```typescript
+ * const fn: AnyFunction<[string, number], boolean> = (s: string, n: number) => s.length > n;
+ * ```
+ */
+type AnyFunction<T extends unknown[] = [], R = void> = {
+  (...args: T): R;
+  // Additional properties
+  [key: string | number | symbol]: unknown;
+};
+
+type Id<T> = string & { __type: T };
+
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  timestamp?: string;
+  pointIndex?: number;
+}
+
+type DistanceCalculationMethod = "haversine" | "euclidean";
+
+export interface RouteSimplificationOptions {
+  tolerance?: number;
+  highQuality?: boolean;
+  maxPoints?: number;
+  preserveElevation?: boolean;
+  preserveTimestamps?: boolean;
+}
+
+export interface ElevationProfile {
+  points: Array<{
+    distance: number;
+    elevation: number;
+    grade?: number;
+  }>;
+  gain: number;
+  loss: number;
+  max: number;
+  min: number;
+  totalDistance: number;
+  elevationGain: number;
+  elevationLoss: number;
+  maxElevation: number;
+  minElevation: number;
+}
+
+export interface SpeedProfile {
+  points: Array<{
+    distance: number;
+    speed: number;
+    pace?: number;
+  }>;
+  average: number;
+  max: number;
+  min: number;
+  averageSpeed: number;
+  maxSpeed: number;
+  totalTime: number;
+}
+
+export interface ActivityStats {
+  distance: number;
+  duration: number;
+  elevationGain: number;
+  elevationLoss: number;
+  maxElevation: number;
+  minElevation: number;
+  avgSpeed: number;
+  maxSpeed: number;
+  startTime?: string;
+  endTime?: string;
+  avgPace: number;
+  [key: string]: unknown; // Allow additional properties
+}
+
+export interface ActivitySummary {
+  id?: string;
+  type: string;
+  distance: number;
+  duration: number;
+  startTime?: string;
+  endTime?: string;
+}
+
+export interface GPXData {
+  tracks: Array<{
+    points: ActivityPoint[];
+    distance: number;
+    startTime?: string;
+    endTime?: string;
+    segments?: Array<{
+      points: Array<{
+        latitude: number;
+        longitude: number;
+        elevation?: number;
+        timestamp?: number;
+        [key: string]: unknown;
+      }>;
+      [key: string]: unknown;
+    }>;
+  }>;
+  metadata?: {
+    name?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ActivityPoint extends Coordinates {
+  elevation?: number;
+  timestamp?: string;
+  pointIndex?: number;
+  speed?: number;
+  cadence?: number;
+  heartRate?: number;
+  temperature?: number;
+  power?: number;
+  grade?: number;
+  distance?: number;
+  cumulativeDistance?: number;
+  time?: string;
+  [key: string]: unknown;
+}
+
+export interface SpeedPoint {
+  distance: number;
+  speed: number;
+  pace?: number;
+  timestamp?: string;
+}
+
+export interface BoundingBox {
+  south: number;
+  east: number;
+  west: number;
+  north: number;
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-export const EARTH_RADIUS_KM = 6371;
-export const EARTH_RADIUS_MILES = 3959;
-
-export const DEFAULT_SIMPLIFICATION_TOLERANCE = 0.0001; // ~11 meters
-export const DEFAULT_MAX_POINTS = 1000;
+const EARTH_RADIUS_KM = 6371;
+const DEFAULT_SIMPLIFICATION_TOLERANCE = 0.0001;
+const DEFAULT_MAX_POINTS = 1000;
 
 export const ACTIVITY_TYPES = {
   RUNNING: "running",
@@ -58,80 +185,465 @@ export const COLOR_PALETTES = {
 } as const;
 
 // ============================================================================
-// Distance and Geospatial Calculations
+// UI Utilities
 // ============================================================================
 
 /**
- * Calculate the distance between two coordinates using the Haversine formula
+ * Combines multiple class names and merges Tailwind CSS classes
+ * @param inputs - Class values to be combined
+ * @returns Merged class string
+ */
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
+}
+
+// ============================================================================
+// Client-side Storage
+// ============================================================================
+
+/**
+ * Safely get an item from localStorage
+ * @param key - Storage key
+ * @param defaultValue - Default value if key doesn't exist
+ * @returns The stored value or default value
+ */
+export function getLocalStorage<T>(key: string, defaultValue: T): T {
+  if (typeof window === "undefined") return defaultValue;
+
+  try {
+    const item = window.localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.warn(`Error reading localStorage key "${key}":`, error);
+    return defaultValue;
+  }
+}
+
+/**
+ * Safely set an item in localStorage
+ * @param key - Storage key
+ * @param value - Value to store
+ */
+export function setLocalStorage<T>(key: string, value: T): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Error setting localStorage key "${key}":`, error);
+  }
+}
+
+// ============================================================================
+// Client-side Utilities
+// ============================================================================
+
+/**
+ * Debounce a function call
+ * @param func - Function to debounce
+ * @param wait - Wait time in milliseconds
+ * @returns Debounced function
+ */
+export function debounce<T extends AnyFunction>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  return function (this: unknown, ...args: Parameters<T>): void {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => {
+      func.apply(this, args);
+      timeout = null;
+    }, wait);
+  };
+}
+
+/**
+ * Throttle a function call
+ * @param func - Function to throttle
+ * @param limit - Time limit in milliseconds
+ * @returns Throttled function
+ */
+export function throttle<T extends AnyFunction>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  let inThrottle = false;
+  let lastResult: ReturnType<T> | undefined;
+
+  return function (this: unknown, ...args: Parameters<T>): ReturnType<T> | undefined {
+    if (!inThrottle) {
+      inThrottle = true;
+      lastResult = func.apply(this, args) as ReturnType<T>;
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
+    }
+    return lastResult;
+  };
+}
+
+// ============================================================================
+// Formatting Utilities
+// ============================================================================
+
+/**
+ * Format distance for display
+ * @param distance - Distance in kilometers
+ * @param unit - Unit to display (km or miles)
+ * @returns Formatted distance string
+ */
+export function formatDistance(distance: number, unit: "km" | "miles" = "km"): string {
+  const convertedDistance = unit === "miles" ? distance * 0.621371 : distance;
+
+  if (convertedDistance < 1) {
+    return `${Math.round(convertedDistance * 1000)} m`;
+  }
+
+  return `${convertedDistance.toFixed(2)} ${unit}`;
+}
+
+/**
+ * Format duration for display
+ * @param milliseconds - Duration in milliseconds
+ * @returns Formatted duration string (HH:MM:SS or MM:SS)
+ */
+export function formatDuration(milliseconds: number): string {
+  const seconds = Math.floor(milliseconds / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}:${(minutes % 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+/**
+ * Format speed for display
+ * @param speed - Speed in km/h
+ * @param unit - Unit to display (kmh or mph)
+ * @returns Formatted speed string
+ */
+export function formatSpeed(speed: number, unit: "kmh" | "mph" = "kmh"): string {
+  const convertedSpeed = unit === "mph" ? speed * 0.621371 : speed;
+  return `${convertedSpeed.toFixed(1)} ${unit}`;
+}
+
+/**
+ * Format pace for display
+ * @param pace - Pace in min/km
+ * @param unit - Unit to display (min/km or min/mile)
+ * @returns Formatted pace string
+ */
+export function formatPace(pace: number, unit: "min/km" | "min/mile" = "min/km"): string {
+  const convertedPace = unit === "min/mile" ? pace / 0.621371 : pace;
+  const minutes = Math.floor(convertedPace);
+  const seconds = Math.round((convertedPace - minutes) * 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")} ${unit}`;
+}
+
+// ============================================================================
+// UI Helpers
+// ============================================================================
+
+/**
+ * Generate a unique color for an activity
+ * @param index - Index of the activity
+ * @param palette - Color palette to use
+ * @returns CSS color string
+ */
+export function generateActivityColor(index: number, palette = "default"): string {
+  const palettes = {
+    default: ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"],
+    vibrant: ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"],
+    pastel: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#FFD1DC", "#E0BBE4"],
+    nature: ["#2E8B57", "#8FBC8F", "#228B22", "#32CD32", "#9ACD32", "#6B8E23"],
+  };
+
+  const colors = palettes[palette as keyof typeof palettes] || palettes.default;
+  return colors[index % colors.length];
+}
+
+// ============================================================================
+// Geospatial Utilities (Client-side only)
+// ============================================================================
+
+/**
+ * Convert degrees to radians
+ */
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+/**
+ * Validate coordinates
+ * @param lat - Latitude
+ * @param lng - Longitude
+ * @returns Boolean indicating if coordinates are valid
+ */
+export function isValidCoordinate(lat: number, lng: number): boolean {
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+/**
+ * Calculate the distance between two geographic points using the specified method
+ * @param point1 - First coordinate point
+ * @param point2 - Second coordinate point
+ * @param method - Distance calculation method (default: "haversine")
+ * @returns Distance in kilometers
+ * @throws {Error} If coordinates are invalid
  */
 export function calculateDistance(
   point1: Coordinates,
   point2: Coordinates,
   method: DistanceCalculationMethod = "haversine"
 ): number {
+  // Ensure we have valid coordinates with proper type checking
+  const lat1 = typeof point1.latitude === "number" ? point1.latitude : 0;
+  const lon1 = typeof point1.longitude === "number" ? point1.longitude : 0;
+  const lat2 = typeof point2.latitude === "number" ? point2.latitude : 0;
+  const lon2 = typeof point2.longitude === "number" ? point2.longitude : 0;
+
+  if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
+    throw new Error("Invalid coordinates provided");
+  }
+
   if (method === "euclidean") {
     return calculateEuclideanDistance(point1, point2);
   }
 
-  const lat1Rad = (point1.latitude * Math.PI) / 180;
-  const lat2Rad = (point2.latitude * Math.PI) / 180;
-  const deltaLatRad = ((point2.latitude - point1.latitude) * Math.PI) / 180;
-  const deltaLngRad = ((point2.longitude - point1.longitude) * Math.PI) / 180;
+  // Type-safe coordinate validation with explicit number type
+  const toValidCoordinate = (value: unknown): number => {
+    // Handle number type
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : 0;
+    }
+    // Handle string type
+    if (typeof value === "string") {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    // Handle boolean, null, undefined, or any other type
+    return 0;
+  };
 
-  const a =
-    Math.sin(deltaLatRad / 2) * Math.sin(deltaLatRad / 2) +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(deltaLngRad / 2) * Math.sin(deltaLngRad / 2);
+  // Convert and validate all coordinates with explicit number type
+  const lat1Num = toValidCoordinate(lat1);
+  const lon1Num = toValidCoordinate(lon1);
+  const lat2Num = toValidCoordinate(lat2);
+  const lon2Num = toValidCoordinate(lon2);
+
+  // Type-safe number operations with explicit type assertions
+  const dLatNum: number = Number(lat2Num) - Number(lat1Num);
+  const dLonNum: number = Number(lon2Num) - Number(lon1Num);
+
+  // Convert to radians with type safety
+  const dLatRad: number = toRadians(dLatNum);
+  const dLonRad: number = toRadians(dLonNum);
+  const lat1Rad: number = toRadians(lat1Num);
+  const lat2Rad: number = toRadians(lat2Num);
+
+  // Calculate intermediate values
+  const halfDLat = dLatRad / 2;
+  const halfDLon = dLonRad / 2;
+  const sinDLat = Math.sin(halfDLat);
+  const sinDLon = Math.sin(halfDLon);
+  const cosLat1 = Math.cos(lat1Rad);
+  const cosLat2 = Math.cos(lat2Rad);
+
+  // Ensure all values are finite before calculations
+  if (
+    !Number.isFinite(sinDLat) ||
+    !Number.isFinite(sinDLon) ||
+    !Number.isFinite(cosLat1) ||
+    !Number.isFinite(cosLat2)
+  ) {
+    return 0;
+  }
+
+  // Calculate 'a' with type-safe operations
+  const sinDLatSq = sinDLat * sinDLat;
+  const sinDLonSq = sinDLon * sinDLon;
+  const cosProduct = cosLat1 * cosLat2;
+  const a = sinDLatSq + cosProduct * sinDLonSq;
+
+  if (!Number.isFinite(a)) {
+    return 0;
+  }
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_KM * c;
+  const distance = EARTH_RADIUS_KM * c;
+
+  return Number.isFinite(distance) ? distance : 0;
 }
 
 /**
  * Calculate Euclidean distance between two points (for small distances)
+ * @param point1 - First coordinate point
+ * @param point2 - Second coordinate point
+ * @returns Distance in kilometers
  */
 function calculateEuclideanDistance(point1: Coordinates, point2: Coordinates): number {
-  const deltaLat = point2.latitude - point1.latitude;
-  const deltaLng = point2.longitude - point1.longitude;
-  return Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng) * 111.32; // Approximate km per degree
+  try {
+    // Type-safe coordinate extraction with validation
+    const getValidCoordinate = (value: unknown, defaultValue: number): number => {
+      return typeof value === "number" && Number.isFinite(value) ? value : defaultValue;
+    };
+
+    const lat1 = getValidCoordinate(point1.latitude, 0);
+    const lon1 = getValidCoordinate(point1.longitude, 0);
+    const lat2 = getValidCoordinate(point2.latitude, 0);
+    const lon2 = getValidCoordinate(point2.longitude, 0);
+
+    // Validate coordinates
+    if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
+      return 0;
+    }
+
+    // Calculate differences in degrees
+    const latDiff = lat2 - lat1;
+    const lonDiff = lon2 - lon1;
+
+    // Use Haversine formula for better accuracy
+    const R = 6371; // Earth's radius in km
+    const dLat = toRadians(latDiff);
+    const dLon = toRadians(lonDiff);
+
+    // Ensure all values are finite before calculations
+    if (!Number.isFinite(dLat) || !Number.isFinite(dLon)) {
+      return 0;
+    }
+
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const cosLat1 = Math.cos(toRadians(lat1));
+    const cosLat2 = Math.cos(toRadians(lat2));
+
+    if (
+      !Number.isFinite(sinDLat) ||
+      !Number.isFinite(sinDLon) ||
+      !Number.isFinite(cosLat1) ||
+      !Number.isFinite(cosLat2)
+    ) {
+      return 0;
+    }
+
+    const a = sinDLat * sinDLat + cosLat1 * cosLat2 * sinDLon * sinDLon;
+
+    if (!Number.isFinite(a)) {
+      return 0;
+    }
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    return Number.isFinite(distance) ? distance : 0;
+  } catch (error) {
+    console.error("Error calculating Euclidean distance:", error);
+    return 0;
+  }
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Clamp a value between min and max
+ * @param value - Value to clamp
+ * @param min - Minimum value
+ * @param max - Maximum value
+ * @returns Clamped value
+ */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Generate a slug from a string
+ * @param text - Text to convert to slug
+ * @returns URL-friendly slug
+ */
+export function generateSlug(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]+/g, "")
+    .replace(/--+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Deep clone an object
+ * @param obj - Object to clone
+ * @returns Deep cloned object
+ */
+export function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
 }
 
 /**
  * Calculate the total distance of a route
+ * @param points - Array of activity points
+ * @returns Total distance in kilometers
  */
 export function calculateRouteDistance(points: ActivityPoint[]): number {
-  if (points.length < 2) return 0;
-
-  let totalDistance = 0;
-  for (let i = 1; i < points.length; i++) {
-    totalDistance += calculateDistance(
-      { latitude: points[i - 1].latitude, longitude: points[i - 1].longitude },
-      { latitude: points[i].latitude, longitude: points[i].longitude }
-    );
+  if (!Array.isArray(points) || points.length < 2) {
+    return 0;
   }
-  return totalDistance;
+
+  // Use reduce for better performance with large arrays
+  return points.reduce<number>((total, current, index, array) => {
+    if (index === 0) return 0; // Skip first iteration
+
+    const prev = array[index - 1];
+    return (
+      total +
+      calculateDistance(
+        { latitude: prev.latitude, longitude: prev.longitude },
+        { latitude: current.latitude, longitude: current.longitude }
+      )
+    );
+  }, 0);
 }
 
 /**
  * Calculate the bounding box for a set of coordinates
  */
+/**
+ * Calculate the bounding box that contains all given points
+ * @param points - Array of activity points
+ * @returns Bounding box with north, south, east, and west boundaries
+ * @throws {Error} If points array is empty
+ */
 export function calculateBoundingBox(points: ActivityPoint[]): BoundingBox {
-  if (points.length === 0) {
+  if (!Array.isArray(points) || points.length === 0) {
     throw new Error("Cannot calculate bounding box for empty points array");
   }
 
-  let north = points[0].latitude;
-  let south = points[0].latitude;
-  let east = points[0].longitude;
-  let west = points[0].longitude;
+  // Initialize with first point's coordinates
+  const initial = {
+    south: Number.POSITIVE_INFINITY,
+    east: Number.NEGATIVE_INFINITY,
+    west: Number.POSITIVE_INFINITY,
+    north: Number.NEGATIVE_INFINITY,
+  };
 
-  for (const point of points) {
-    north = Math.max(north, point.latitude);
-    south = Math.min(south, point.latitude);
-    east = Math.max(east, point.longitude);
-    west = Math.min(west, point.longitude);
-  }
-
-  return { north, south, east, west };
+  // Use reduce for better performance with large arrays
+  return points.reduce<BoundingBox>(
+    (bounds, point) => ({
+      north: Math.max(bounds.north, point.latitude),
+      south: Math.min(bounds.south, point.latitude),
+      east: Math.max(bounds.east, point.longitude),
+      west: Math.min(bounds.west, point.longitude),
+    }),
+    initial
+  );
 }
 
 /**
@@ -296,13 +808,88 @@ function uniformSample(points: ActivityPoint[], maxPoints: number): ActivityPoin
 /**
  * Preserve important points based on elevation or timestamp changes
  */
+/**
+ * Preserve important points during simplification based on elevation or timestamp changes
+ * @param original - Original array of activity points
+ * @param simplified - Simplified array of activity points
+ * @param options - Options for preserving specific point attributes
+ * @returns Array of activity points with important points preserved
+ * @private
+ */
 function preserveImportantPoints(
-  _original: ActivityPoint[],
+  original: ActivityPoint[],
   simplified: ActivityPoint[],
-  _options: { preserveElevation: boolean; preserveTimestamps: boolean }
+  options: { preserveElevation: boolean; preserveTimestamps: boolean }
 ): ActivityPoint[] {
-  // This is a simplified implementation - in practice, you might want more sophisticated logic
-  return simplified;
+  if (original.length === 0 || simplified.length === 0) {
+    return simplified;
+  }
+
+  const { preserveElevation, preserveTimestamps } = options;
+
+  // If no preservation needed, return simplified as is
+  if (!preserveElevation && !preserveTimestamps) {
+    return simplified;
+  }
+
+  // Create a Set of simplified point indices for O(1) lookups
+  const simplifiedIndices = new Set(simplified.map((point) => point.pointIndex));
+
+  // Find important points that were removed during simplification
+  const importantPoints = original.filter((point, index) => {
+    // Always keep first and last points
+    if (index === 0 || index === original.length - 1) {
+      return false; // Already included in simplified set
+    }
+
+    // Check if this point is already in the simplified set
+    if (simplifiedIndices.has(point.pointIndex)) {
+      return false;
+    }
+
+    // Check if this point is important based on options
+    if (preserveElevation) {
+      const prev = original[index - 1];
+      const next = original[index + 1];
+
+      // Check for local maxima/minima in elevation
+      const isPeak =
+        (point.elevation || 0) > (prev.elevation || 0) &&
+        (point.elevation || 0) > (next.elevation || 0);
+
+      const isValley =
+        (point.elevation || 0) < (prev.elevation || 0) &&
+        (point.elevation || 0) < (next.elevation || 0);
+
+      if (isPeak || isValley) {
+        return true;
+      }
+    }
+
+    if (preserveTimestamps && point.timestamp) {
+      // Add points with significant time gaps
+      const prev = original[index - 1];
+      if (
+        prev.timestamp &&
+        point.timestamp &&
+        new Date(point.timestamp).getTime() - new Date(prev.timestamp).getTime() > 60000
+      ) {
+        // 1 minute gap
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  // Merge and sort the points while maintaining order
+  const merged = [...simplified, ...importantPoints].sort((a, b) => {
+    const aIndex = a.pointIndex ?? 0;
+    const bIndex = b.pointIndex ?? 0;
+    return Number(aIndex) - Number(bIndex);
+  });
+
+  return merged;
 }
 
 // ============================================================================
@@ -311,6 +898,8 @@ function preserveImportantPoints(
 
 /**
  * Calculate elevation gain and loss for a route
+ * @param points - Array of activity points with elevation data
+ * @returns Object containing elevation statistics
  */
 export function calculateElevationStats(points: ActivityPoint[]): {
   gain: number;
@@ -318,39 +907,72 @@ export function calculateElevationStats(points: ActivityPoint[]): {
   max: number;
   min: number;
 } {
-  if (points.length === 0) {
+  // Handle empty or invalid input
+  if (!Array.isArray(points) || points.length === 0) {
     return { gain: 0, loss: 0, max: 0, min: 0 };
   }
 
+  // Initialize with safe defaults
   let gain = 0;
   let loss = 0;
-  let max = points[0].elevation || 0;
-  let min = points[0].elevation || 0;
 
+  // Safely get initial elevation with type checking
+  const firstPoint = points[0];
+  const firstElevation =
+    firstPoint && typeof firstPoint.elevation === "number" && Number.isFinite(firstPoint.elevation)
+      ? firstPoint.elevation
+      : 0;
+
+  let max = firstElevation;
+  let min = firstElevation;
+  let previousElevation = firstElevation;
+
+  // Process points starting from the second one
   for (let i = 1; i < points.length; i++) {
-    const currentElevation = points[i].elevation || 0;
-    const previousElevation = points[i - 1].elevation || 0;
+    const point = points[i];
+    if (!point) continue;
 
+    // Safely get current elevation with type checking
+    const currentElevation =
+      point && typeof point.elevation === "number" && Number.isFinite(point.elevation)
+        ? point.elevation
+        : previousElevation; // Use previous elevation if current is invalid
+
+    // Update min/max
     max = Math.max(max, currentElevation);
     min = Math.min(min, currentElevation);
 
+    // Calculate elevation difference
     const elevationDiff = currentElevation - previousElevation;
     if (elevationDiff > 0) {
       gain += elevationDiff;
-    } else {
+    } else if (elevationDiff < 0) {
       loss += Math.abs(elevationDiff);
     }
+
+    // Update previous elevation for next iteration
+    previousElevation = currentElevation;
   }
 
-  return { gain, loss, max, min };
+  // Ensure all return values are valid numbers
+  return {
+    gain: Number.isFinite(gain) ? gain : 0,
+    loss: Number.isFinite(loss) ? loss : 0,
+    max: Number.isFinite(max) ? max : 0,
+    min: Number.isFinite(min) ? min : 0,
+  };
 }
 
 /**
  * Generate elevation profile data for visualization
  */
 export function generateElevationProfile(points: ActivityPoint[]): ElevationProfile {
-  const profile: ElevationProfile = {
+  const emptyProfile: ElevationProfile = {
     points: [],
+    gain: 0,
+    loss: 0,
+    max: 0,
+    min: 0,
     totalDistance: 0,
     elevationGain: 0,
     elevationLoss: 0,
@@ -358,48 +980,148 @@ export function generateElevationProfile(points: ActivityPoint[]): ElevationProf
     minElevation: 0,
   };
 
-  if (points.length === 0) return profile;
+  // Validate input
+  if (!Array.isArray(points) || points.length === 0) {
+    return emptyProfile;
+  }
 
-  let cumulativeDistance = 0;
+  // Calculate elevation statistics with type safety
   const elevationStats = calculateElevationStats(points);
+  const profilePoints: Array<{ distance: number; elevation: number; grade?: number }> = [];
 
-  profile.elevationGain = elevationStats.gain;
-  profile.elevationLoss = elevationStats.loss;
-  profile.maxElevation = elevationStats.max;
-  profile.minElevation = elevationStats.min;
+  // Initialize with safe defaults
+  let cumulativeDistance = 0;
 
-  for (let i = 0; i < points.length; i++) {
-    if (i > 0) {
-      cumulativeDistance += calculateDistance(
-        { latitude: points[i - 1].latitude, longitude: points[i - 1].longitude },
-        { latitude: points[i].latitude, longitude: points[i].longitude }
-      );
-    }
+  // Safely get initial elevation with type checking
+  const firstElevation =
+    typeof points[0]?.elevation === "number" && Number.isFinite(points[0].elevation)
+      ? Number(points[0].elevation)
+      : 0;
 
-    profile.points.push({
-      distance: cumulativeDistance,
-      elevation: points[i].elevation || 0,
-      grade: i > 0 ? calculateGrade(points[i - 1], points[i]) : 0,
+  // Add first point with validation
+  profilePoints.push({
+    distance: 0,
+    elevation: firstElevation,
+    grade: 0,
+  });
+
+  // Process remaining points
+  for (let i = 1; i < points.length; i++) {
+    const prevPoint = points[i - 1];
+    const currPoint = points[i];
+    if (!prevPoint || !currPoint) continue;
+
+    // Type-safe coordinate extraction
+    const prevLat = typeof prevPoint.latitude === "number" ? prevPoint.latitude : 0;
+    const prevLon = typeof prevPoint.longitude === "number" ? prevPoint.longitude : 0;
+    const currLat = typeof currPoint.latitude === "number" ? currPoint.latitude : 0;
+    const currLon = typeof currPoint.longitude === "number" ? currPoint.longitude : 0;
+
+    // Calculate distance between points with validation
+    const distance = calculateDistance(
+      { latitude: prevLat, longitude: prevLon },
+      { latitude: currLat, longitude: currLon }
+    );
+
+    // Skip invalid distances
+    if (!Number.isFinite(distance) || distance < 0) continue;
+
+    // Update cumulative distance with validation
+    const newCumulativeDistance = cumulativeDistance + distance;
+    if (!Number.isFinite(newCumulativeDistance)) continue;
+    cumulativeDistance = newCumulativeDistance;
+
+    // Calculate grade with type safety and validation
+    const currentElevation =
+      typeof currPoint.elevation === "number" && Number.isFinite(currPoint.elevation)
+        ? Number(currPoint.elevation)
+        : 0;
+    const prevElevation =
+      typeof prevPoint.elevation === "number" && Number.isFinite(prevPoint.elevation)
+        ? Number(prevPoint.elevation)
+        : 0;
+
+    const elevationDiff = currentElevation - prevElevation;
+    const grade =
+      distance > 0 && Number.isFinite(elevationDiff) ? (elevationDiff / distance) * 100 : 0;
+
+    profilePoints.push({
+      distance: Number(cumulativeDistance.toFixed(2)),
+      elevation: Number(currentElevation.toFixed(1)),
+      grade: Number(grade.toFixed(1)),
     });
   }
 
-  profile.totalDistance = cumulativeDistance;
-  return profile;
+  return {
+    points: profilePoints,
+    gain: Number(elevationStats.gain.toFixed(1)),
+    loss: Number(elevationStats.loss.toFixed(1)),
+    max: Number(elevationStats.max.toFixed(1)),
+    min: Number(elevationStats.min.toFixed(1)),
+    totalDistance: Number(cumulativeDistance.toFixed(2)),
+    elevationGain: Number(elevationStats.gain.toFixed(1)),
+    elevationLoss: Number(elevationStats.loss.toFixed(1)),
+    maxElevation: Number(elevationStats.max.toFixed(1)),
+    minElevation: Number(elevationStats.min.toFixed(1)),
+  };
 }
 
 /**
- * Calculate grade between two points
+ * Calculate grade between two points as a percentage
+ * @param point1 - First point
+ * @param point2 - Second point
+ * @returns Grade as a percentage (positive for ascent, negative for descent)
  */
-function calculateGrade(point1: ActivityPoint, point2: ActivityPoint): number {
-  const distance = calculateDistance(
-    { latitude: point1.latitude, longitude: point1.longitude },
-    { latitude: point2.latitude, longitude: point2.longitude }
-  );
+function _calculateGrade(point1: ActivityPoint, point2: ActivityPoint): number {
+  try {
+    // Ensure we have valid points
+    if (!point1 || !point2) return 0;
 
-  if (distance === 0) return 0;
+    // Type-safe coordinate extraction with validation
+    const lat1 =
+      typeof point1.latitude === "number" && Number.isFinite(point1.latitude) ? point1.latitude : 0;
+    const lon1 =
+      typeof point1.longitude === "number" && Number.isFinite(point1.longitude)
+        ? point1.longitude
+        : 0;
+    const ele1 =
+      typeof point1.elevation === "number" && Number.isFinite(point1.elevation)
+        ? point1.elevation
+        : 0;
+    const lat2 =
+      typeof point2.latitude === "number" && Number.isFinite(point2.latitude) ? point2.latitude : 0;
+    const lon2 =
+      typeof point2.longitude === "number" && Number.isFinite(point2.longitude)
+        ? point2.longitude
+        : 0;
+    const ele2 =
+      typeof point2.elevation === "number" && Number.isFinite(point2.elevation)
+        ? point2.elevation
+        : 0;
 
-  const elevationDiff = (point2.elevation || 0) - (point1.elevation || 0);
-  return (elevationDiff / (distance * 1000)) * 100; // Convert to percentage
+    // Calculate elevation difference
+    const elevationDiff = ele2 - ele1;
+
+    // Calculate horizontal distance in meters
+    const horizontalDistanceMeters =
+      calculateEuclideanDistance(
+        { latitude: lat1, longitude: lon1 },
+        { latitude: lat2, longitude: lon2 }
+      ) * 1000; // Convert km to m
+
+    // Avoid division by zero
+    if (horizontalDistanceMeters <= 0) return 0;
+
+    // Calculate grade (rise/run * 100)
+    const grade = (elevationDiff / horizontalDistanceMeters) * 100;
+
+    // Handle potential floating point precision issues and ensure we return a number
+    const roundedGrade = Number(grade.toFixed(1));
+    return Number.isFinite(roundedGrade) ? roundedGrade : 0;
+  } catch (error) {
+    console.warn("Error calculating grade:", error);
+    return 0;
+  }
 }
 
 // ============================================================================
@@ -407,20 +1129,94 @@ function calculateGrade(point1: ActivityPoint, point2: ActivityPoint): number {
 // ============================================================================
 
 /**
- * Calculate speed between two points
+ * Calculate speed between two points in kilometers per hour (km/h)
+ * @param point1 - First activity point with coordinates and timestamp
+ * @param point2 - Second activity point with coordinates and timestamp
+ * @returns Speed in km/h, or 0 if calculation is not possible
  */
 export function calculateSpeed(point1: ActivityPoint, point2: ActivityPoint): number {
-  if (!point1.timestamp || !point2.timestamp) return 0;
+  try {
+    // Validate timestamps
+    const timestamp1 = point1?.timestamp;
+    const timestamp2 = point2?.timestamp;
 
-  const distance = calculateDistance(
-    { latitude: point1.latitude, longitude: point1.longitude },
-    { latitude: point2.latitude, longitude: point2.longitude }
-  );
+    if (!timestamp1 || !timestamp2) return 0;
 
-  const timeDiff = (point2.timestamp - point1.timestamp) / 1000; // Convert to seconds
-  if (timeDiff === 0) return 0;
+    // Type-safe number extraction with explicit type checking
+    const getValidNumber = (value: unknown, defaultValue: number): number => {
+      // Handle null/undefined
+      if (value === null || value === undefined) return defaultValue;
 
-  return (distance / timeDiff) * 3.6; // Convert m/s to km/h
+      // Handle number type directly
+      if (typeof value === "number") {
+        return Number.isFinite(value) ? value : defaultValue;
+      }
+
+      // Handle string type with parsing
+      if (typeof value === "string") {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+      }
+
+      // For any other type, return default
+      return defaultValue;
+    };
+
+    // Extract and validate coordinates
+    const lat1 = getValidNumber(point1.latitude, 0);
+    const lon1 = getValidNumber(point1.longitude, 0);
+    const lat2 = getValidNumber(point2.latitude, 0);
+    const lon2 = getValidNumber(point2.longitude, 0);
+
+    // Skip if points are the same
+    if (lat1 === lat2 && lon1 === lon2) return 0;
+
+    // Create type-safe coordinate objects
+    const pointA = {
+      latitude: lat1,
+      longitude: lon1,
+    };
+    const pointB = {
+      latitude: lat2,
+      longitude: lon2,
+    };
+
+    // Calculate distance with validation
+    const distanceKm = calculateDistance(pointA, pointB);
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0) return 0;
+
+    // Convert timestamps to numbers safely with validation
+    const time1 = timestamp1 ? new Date(timestamp1).getTime() : Number.NaN;
+    const time2 = timestamp2 ? new Date(timestamp2).getTime() : Number.NaN;
+
+    // Convert to numbers explicitly
+    const time1Num = Number(time1);
+    const time2Num = Number(time2);
+
+    // Validate timestamps and ensure time2 is after time1
+    if (!Number.isFinite(time1Num) || !Number.isFinite(time2Num) || time1Num >= time2Num) {
+      return 0;
+    }
+
+    // Calculate time difference in hours with type safety
+    const timeDiffMs = time2Num - time1Num;
+    const msPerHour = 1000 * 60 * 60;
+    const timeDiffHours = timeDiffMs / msPerHour;
+
+    // Validate time difference
+    if (timeDiffHours <= 0 || !Number.isFinite(timeDiffHours)) {
+      return 0;
+    }
+
+    // Calculate speed in km/h with type-safe division
+    const speedKph = Number(distanceKm) / Number(timeDiffHours);
+
+    // Return 0 for any invalid or unrealistic speeds
+    return Number.isFinite(speedKph) && speedKph >= 0 ? speedKph : 0;
+  } catch (error) {
+    console.error("Error calculating speed:", error);
+    return 0;
+  }
 }
 
 /**
@@ -440,7 +1236,8 @@ export function calculateAverageSpeed(points: ActivityPoint[]): number {
   }
 
   const totalDistance = calculateRouteDistance(points);
-  const totalTime = (lastPoint.timestamp - firstPoint.timestamp) / 1000; // Convert to seconds
+  const totalTime =
+    (new Date(lastPoint.timestamp).getTime() - new Date(firstPoint.timestamp).getTime()) / 1000; // Convert to seconds
 
   if (totalTime === 0) return 0;
 
@@ -451,52 +1248,117 @@ export function calculateAverageSpeed(points: ActivityPoint[]): number {
  * Generate speed profile for visualization
  */
 export function generateSpeedProfile(points: ActivityPoint[]): SpeedProfile {
-  const profile: SpeedProfile = {
+  // Initialize result with default values and type safety
+  const result: SpeedProfile = {
     points: [],
+    average: 0,
+    max: 0,
+    min: 0,
     averageSpeed: 0,
     maxSpeed: 0,
     totalTime: 0,
   };
 
-  if (points.length < 2) return profile;
+  // Early return for insufficient points
+  if (!Array.isArray(points) || points.length < 2) {
+    return result;
+  }
 
-  let cumulativeDistance = 0;
+  // Initialize variables with proper type safety
   let totalSpeed = 0;
   let speedCount = 0;
+  let minSpeed = Number.POSITIVE_INFINITY;
+  let maxSpeed = 0;
+  let cumulativeDistance = 0;
+  const validPoints: SpeedPoint[] = [];
 
+  // Process points to calculate speeds and distances
   for (let i = 1; i < points.length; i++) {
+    const prevPoint = points[i - 1];
+    const currPoint = points[i];
+
+    // Skip invalid points
+    if (!prevPoint || !currPoint) continue;
+
+    // Type-safe coordinate extraction
+    const prevLat = typeof prevPoint.latitude === "number" ? prevPoint.latitude : 0;
+    const prevLon = typeof prevPoint.longitude === "number" ? prevPoint.longitude : 0;
+    const currLat = typeof currPoint.latitude === "number" ? currPoint.latitude : 0;
+    const currLon = typeof currPoint.longitude === "number" ? currPoint.longitude : 0;
+
+    // Calculate distance between points with type safety
     const distance = calculateDistance(
-      { latitude: points[i - 1].latitude, longitude: points[i - 1].longitude },
-      { latitude: points[i].latitude, longitude: points[i].longitude }
+      { latitude: prevLat, longitude: prevLon },
+      { latitude: currLat, longitude: currLon }
     );
-    cumulativeDistance += distance;
 
-    const speed = calculateSpeed(points[i - 1], points[i]);
-    if (speed > 0) {
-      totalSpeed += speed;
-      speedCount++;
-      profile.maxSpeed = Math.max(profile.maxSpeed, speed);
-    }
+    // Skip invalid distances
+    if (!Number.isFinite(distance) || distance < 0) continue;
 
-    profile.points.push({
-      distance: cumulativeDistance,
-      speed,
-      pace: speed > 0 ? 60 / speed : 0, // minutes per km
-      timestamp: points[i].timestamp || 0,
+    // Update cumulative distance with validation
+    const newCumulativeDistance = cumulativeDistance + distance;
+    if (!Number.isFinite(newCumulativeDistance)) continue;
+    cumulativeDistance = newCumulativeDistance;
+
+    // Calculate speed with validation
+    const speed = calculateSpeed(prevPoint, currPoint);
+    if (!Number.isFinite(speed) || speed < 0) continue;
+
+    // Update statistics with validation
+    const newTotalSpeed = totalSpeed + speed;
+    if (!Number.isFinite(newTotalSpeed)) continue;
+
+    totalSpeed = newTotalSpeed;
+    speedCount++;
+    maxSpeed = Math.max(maxSpeed, speed);
+    minSpeed = Math.min(minSpeed, speed);
+
+    // Calculate pace with validation (minutes per km)
+    const pace = speed > 0 ? 60 / speed : 0;
+
+    // Add valid speed point
+    validPoints.push({
+      distance: Number(cumulativeDistance.toFixed(2)),
+      speed: Number(speed.toFixed(2)),
+      pace: Number(pace.toFixed(2)),
     });
   }
 
-  profile.averageSpeed = speedCount > 0 ? totalSpeed / speedCount : 0;
+  // Calculate time difference between first and last point with validation
+  let totalTime = 0;
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
 
-  const firstTimestamp = points.find((p) => p.timestamp)?.timestamp || 0;
-  const lastTimestamp =
-    points
-      .slice()
-      .reverse()
-      .find((p) => p.timestamp)?.timestamp || 0;
-  profile.totalTime = lastTimestamp - firstTimestamp;
+  if (firstPoint?.timestamp && lastPoint?.timestamp) {
+    try {
+      const startMs = new Date(firstPoint.timestamp).getTime();
+      const endMs = new Date(lastPoint.timestamp).getTime();
 
-  return profile;
+      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        totalTime = (endMs - startMs) / 1000; // Convert to seconds
+      }
+    } catch (e) {
+      console.warn("Error calculating total time:", e);
+    }
+  }
+
+  // Calculate averages with validation
+  const averageSpeed = speedCount > 0 && Number.isFinite(totalSpeed) ? totalSpeed / speedCount : 0;
+
+  // Ensure minSpeed is a valid number
+  const safeMinSpeed =
+    Number.isFinite(minSpeed) && minSpeed !== Number.POSITIVE_INFINITY ? minSpeed : 0;
+
+  // Return result with validated values
+  return {
+    points: validPoints,
+    average: Number(averageSpeed.toFixed(2)),
+    max: Number(maxSpeed.toFixed(2)),
+    min: Number(safeMinSpeed.toFixed(2)),
+    averageSpeed: Number(averageSpeed.toFixed(2)),
+    maxSpeed: Number(maxSpeed.toFixed(2)),
+    totalTime: Number(totalTime.toFixed(2)),
+  };
 }
 
 // ============================================================================
@@ -507,65 +1369,122 @@ export function generateSpeedProfile(points: ActivityPoint[]): SpeedProfile {
  * Calculate comprehensive activity statistics
  */
 export function calculateActivityStats(points: ActivityPoint[]): ActivityStats {
-  if (points.length === 0) {
-    return {
-      distance: 0,
-      duration: 0,
-      elevationGain: 0,
-      elevationLoss: 0,
-      maxElevation: 0,
-      minElevation: 0,
-      avgSpeed: 0,
-      maxSpeed: 0,
-      avgPace: 0,
-      estimatedCalories: 0,
-      boundingBox: { north: 0, south: 0, east: 0, west: 0 },
-      centerLat: 0,
-      centerLng: 0,
-    };
+  if (!points?.length) {
+    throw new Error("No points provided");
   }
 
-  const distance = calculateRouteDistance(points);
-  const elevationStats = calculateElevationStats(points);
-  const avgSpeed = calculateAverageSpeed(points);
-  const speedProfile = generateSpeedProfile(points);
-  const boundingBox = calculateBoundingBox(points);
-  const center = calculateCenter(boundingBox);
+  // Initialize variables with type safety
+  let totalDistance = 0;
+  let elevationGain = 0;
+  let elevationLoss = 0;
+  let maxSpeed = 0;
 
-  const firstTimestamp = points.find((p) => p.timestamp)?.timestamp || 0;
-  const lastTimestamp =
-    points
-      .slice()
-      .reverse()
-      .find((p) => p.timestamp)?.timestamp || 0;
-  const duration = lastTimestamp - firstTimestamp;
+  // Safe elevation initialization with type checking
+  const initialElevation = typeof points[0]?.elevation === "number" ? points[0].elevation : 0;
+  let minElevation = initialElevation;
+  let maxElevation = initialElevation;
+
+  let startTime: string | undefined;
+  let endTime: string | undefined;
+
+  // Calculate basic stats
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    if (!prev || !curr) continue;
+
+    // Calculate distance between points with type safety
+    const distance = calculateDistance(prev, curr);
+    if (Number.isFinite(distance)) {
+      totalDistance += distance;
+    }
+
+    // Calculate elevation changes with type safety
+    const prevElevation = typeof prev.elevation === "number" ? prev.elevation : 0;
+    const currElevation = typeof curr.elevation === "number" ? curr.elevation : 0;
+
+    if (Number.isFinite(prevElevation) && Number.isFinite(currElevation)) {
+      const elevationDiff = currElevation - prevElevation;
+      if (elevationDiff > 0) {
+        elevationGain += elevationDiff;
+      } else {
+        elevationLoss += Math.abs(elevationDiff);
+      }
+
+      minElevation = Math.min(minElevation, currElevation);
+      maxElevation = Math.max(maxElevation, currElevation);
+    }
+
+    // Track start and end times with type safety
+    if (typeof curr.timestamp === "string") {
+      if (!startTime || curr.timestamp < startTime) startTime = curr.timestamp;
+      if (!endTime || curr.timestamp > endTime) endTime = curr.timestamp;
+    }
+
+    // Calculate speed (if timestamps are available)
+    if (prev.timestamp && curr.timestamp) {
+      try {
+        const prevTime = new Date(prev.timestamp).getTime();
+        const currTime = new Date(curr.timestamp).getTime();
+
+        if (Number.isFinite(prevTime) && Number.isFinite(currTime) && prevTime < currTime) {
+          const timeDiff = currTime - prevTime;
+          if (timeDiff > 0) {
+            const speed = (distance * 1000) / timeDiff; // km/s
+            if (Number.isFinite(speed)) {
+              maxSpeed = Math.max(maxSpeed, speed);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Error calculating speed:", error);
+      }
+    }
+  }
+
+  // Calculate duration in seconds with validation
+  let duration = 0;
+  if (startTime && endTime) {
+    try {
+      const start = new Date(startTime).getTime();
+      const end = new Date(endTime).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && start < end) {
+        duration = (end - start) / 1000;
+      }
+    } catch (error) {
+      console.warn("Error calculating duration:", error);
+    }
+  }
+
+  // Calculate average speed (km/h) with validation
+  const avgSpeed =
+    duration > 0 && Number.isFinite(totalDistance) ? (totalDistance * 3600) / duration : 0;
+
+  // Calculate average pace (min/km) with validation
+  const avgPace = totalDistance > 0 && duration > 0 ? duration / 60 / totalDistance : 0;
+
+  // Ensure all numeric values are finite and non-negative
+  const safeMaxSpeed = Math.max(0, Number.isFinite(maxSpeed) ? maxSpeed * 3.6 : 0); // Convert to km/h
+  const safeTotalDistance = Math.max(0, Number.isFinite(totalDistance) ? totalDistance : 0);
+  const safeDuration = Math.max(0, Number.isFinite(duration) ? duration : 0);
+  const safeElevationGain = Math.max(0, Number.isFinite(elevationGain) ? elevationGain : 0);
+  const safeElevationLoss = Math.max(0, Number.isFinite(elevationLoss) ? elevationLoss : 0);
+  const safeMaxElevation = Number.isFinite(maxElevation) ? maxElevation : 0;
+  const safeMinElevation = Number.isFinite(minElevation) ? minElevation : 0;
 
   return {
-    distance,
-    duration,
-    elevationGain: elevationStats.gain,
-    elevationLoss: elevationStats.loss,
-    maxElevation: elevationStats.max,
-    minElevation: elevationStats.min,
-    avgSpeed,
-    maxSpeed: speedProfile.maxSpeed,
-    avgPace: avgSpeed > 0 ? 60 / avgSpeed : 0,
-    estimatedCalories: estimateCalories(distance, duration, elevationStats.gain),
-    boundingBox,
-    centerLat: center.latitude,
-    centerLng: center.longitude,
+    distance: safeTotalDistance,
+    duration: safeDuration,
+    elevationGain: safeElevationGain,
+    elevationLoss: safeElevationLoss,
+    avgSpeed: Math.max(0, Number.isFinite(avgSpeed) ? avgSpeed : 0),
+    maxSpeed: safeMaxSpeed,
+    maxElevation: safeMaxElevation,
+    minElevation: safeMinElevation,
+    avgPace: Math.max(0, Number.isFinite(avgPace) ? avgPace : 0),
+    startTime,
+    endTime,
   };
-}
-
-/**
- * Estimate calories burned (simplified calculation)
- */
-function estimateCalories(distance: number, _duration: number, elevationGain: number): number {
-  // This is a very simplified calculation - in practice, you'd want to consider
-  // user weight, activity type, heart rate, etc.
-  const baseCalories = distance * 60; // ~60 calories per km
-  const elevationBonus = elevationGain * 0.1; // Small bonus for elevation
-  return Math.round(baseCalories + elevationBonus);
 }
 
 // ============================================================================
@@ -580,21 +1499,57 @@ export function extractActivityPoints(gpxData: GPXData): ActivityPoint[] {
   let pointIndex = 0;
 
   for (const track of gpxData.tracks) {
+    // Skip tracks with no segments or undefined segments
+    if (!track.segments || !Array.isArray(track.segments)) {
+      continue;
+    }
+
     for (const segment of track.segments) {
+      // Skip segments with no points or undefined points
+      if (!segment?.points || !Array.isArray(segment.points)) {
+        continue;
+      }
+
       for (const point of segment.points) {
-        points.push({
-          activityId: "" as Id<"activities">, // Will be set when saving
+        if (!point || typeof point.latitude !== "number" || typeof point.longitude !== "number") {
+          continue; // Skip invalid points
+        }
+
+        // Create a point with required properties
+        const activityPoint: ActivityPoint = {
+          _id: "" as Id<"activityPoints">,
+          _creationTime: 0,
+          activityId: "" as Id<"activities">,
           pointIndex: pointIndex++,
-          latitude: point.latitude,
-          longitude: point.longitude,
-          elevation: point.elevation,
-          timestamp: point.timestamp,
-          speed: point.extensions?.speed,
-          heartRate: point.extensions?.heartRate,
-          cadence: point.extensions?.cadence,
-          power: point.extensions?.power,
-          temperature: point.extensions?.temperature,
-        });
+          latitude: Number(point.latitude),
+          longitude: Number(point.longitude),
+          extensions: { ...(point.extensions || {}) },
+        };
+
+        // Add optional properties if they exist and are valid
+        if (typeof point.elevation === "number") {
+          activityPoint.elevation = point.elevation;
+        }
+        if (typeof point.timestamp === "string") {
+          activityPoint.timestamp = point.timestamp;
+        }
+        if (typeof point.speed === "number") {
+          activityPoint.speed = point.speed;
+        }
+        if (typeof point.heartRate === "number") {
+          activityPoint.heartRate = point.heartRate;
+        }
+        if (typeof point.cadence === "number") {
+          activityPoint.cadence = point.cadence;
+        }
+        if (typeof point.power === "number") {
+          activityPoint.power = point.power;
+        }
+        if (typeof point.temperature === "number") {
+          activityPoint.temperature = point.temperature;
+        }
+
+        points.push(activityPoint);
       }
     }
   }
@@ -609,17 +1564,27 @@ export function generateActivitySummary(gpxData: GPXData): ActivitySummary {
   const points = extractActivityPoints(gpxData);
   const stats = calculateActivityStats(points);
 
+  // Get start and end times from points with timestamps
+  const startTime = points.find((p) => p.timestamp)?.timestamp;
+  const endTime = points
+    .slice()
+    .reverse()
+    .find((p) => p.timestamp)?.timestamp;
+
+  // Calculate duration in seconds if we have both start and end times
+  let duration = 0;
+  if (startTime && endTime) {
+    duration = (new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000;
+  }
+
+  // Return only the properties defined in the ActivitySummary interface
   return {
-    name: gpxData.metadata?.name || "Untitled Activity",
-    description: gpxData.metadata?.description,
-    activityType: inferActivityType(gpxData, stats),
-    startTime: points.find((p) => p.timestamp)?.timestamp,
-    endTime: points
-      .slice()
-      .reverse()
-      .find((p) => p.timestamp)?.timestamp,
-    totalPoints: points.length,
-    ...stats,
+    id: gpxData.metadata?.id as string | undefined,
+    type: inferActivityType(gpxData, stats),
+    distance: stats.distance,
+    duration: Math.round(duration),
+    startTime,
+    endTime,
   };
 }
 
@@ -635,131 +1600,5 @@ function inferActivityType(_gpxData: GPXData, stats: ActivityStats): string {
 }
 
 // ============================================================================
-// Utility Functions
+// GPX Processing Utilities End
 // ============================================================================
-
-/**
- * Format distance for display
- */
-export function formatDistance(distance: number, unit: "km" | "miles" = "km"): string {
-  const convertedDistance = unit === "miles" ? distance * 0.621371 : distance;
-
-  if (convertedDistance < 1) {
-    return `${Math.round(convertedDistance * 1000)} m`;
-  }
-
-  return `${convertedDistance.toFixed(2)} ${unit}`;
-}
-
-/**
- * Format duration for display
- */
-export function formatDuration(milliseconds: number): string {
-  const seconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}:${(minutes % 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${(seconds % 60).toString().padStart(2, "0")}`;
-}
-
-/**
- * Format speed for display
- */
-export function formatSpeed(speed: number, unit: "kmh" | "mph" = "kmh"): string {
-  const convertedSpeed = unit === "mph" ? speed * 0.621371 : speed;
-  return `${convertedSpeed.toFixed(1)} ${unit}`;
-}
-
-/**
- * Format pace for display
- */
-export function formatPace(pace: number, unit: "min/km" | "min/mile" = "min/km"): string {
-  const convertedPace = unit === "min/mile" ? pace / 0.621371 : pace;
-  const minutes = Math.floor(convertedPace);
-  const seconds = Math.round((convertedPace - minutes) * 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")} ${unit}`;
-}
-
-/**
- * Generate a unique color for an activity
- */
-export function generateActivityColor(index: number, palette = "default"): string {
-  const palettes = {
-    default: ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"],
-    vibrant: ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"],
-    pastel: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#FFD1DC", "#E0BBE4"],
-    nature: ["#2E8B57", "#8FBC8F", "#228B22", "#32CD32", "#9ACD32", "#6B8E23"],
-  };
-
-  const colors = palettes[palette as keyof typeof palettes] || palettes.default;
-  return colors[index % colors.length];
-}
-
-/**
- * Validate coordinates
- */
-export function isValidCoordinate(lat: number, lng: number): boolean {
-  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-}
-
-/**
- * Clamp a value between min and max
- */
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-/**
- * Generate a slug from a string
- */
-export function generateSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-/**
- * Deep clone an object
- */
-export function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/**
- * Debounce function
- */
-export function debounce<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
-/**
- * Throttle function
- */
-export function throttle<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle: boolean;
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
-    }
-  };
-}

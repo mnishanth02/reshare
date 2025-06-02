@@ -1,4 +1,3 @@
-import { ACTIVITY_TYPES } from "../../lib/constants";
 import type { Id } from "../_generated/dataModel";
 import type {
   ActivityPoint,
@@ -12,6 +11,21 @@ import type {
   RouteSimplificationOptions,
   SpeedProfile,
 } from "./types";
+
+const ACTIVITY_TYPES = {
+  RUNNING: "running",
+  CYCLING: "cycling",
+  WALKING: "walking",
+  HIKING: "hiking",
+  SWIMMING: "swimming",
+  SKIING: "skiing",
+  OTHER: "other",
+} as const;
+
+/**
+ * Server-side utility functions for activity data processing and calculations.
+ * These functions are optimized for use in Convex server-side environment.
+ */
 
 // ============================================================================
 // Constants
@@ -549,6 +563,9 @@ export function extractActivityPoints(gpxData: GPXData): ActivityPoint[] {
     for (const segment of track.segments) {
       for (const point of segment.points) {
         points.push({
+          // Temporary dummy values for _id and _creationTime; should be replaced when saving to DB
+          _id: "" as Id<"activityPoints">,
+          _creationTime: 0,
           activityId: "" as Id<"activities">, // Will be set when saving
           pointIndex: pointIndex++,
           latitude: point.latitude,
@@ -605,68 +622,10 @@ function inferActivityType(_gpxData: GPXData, stats: ActivityStats): string {
 // ============================================================================
 
 /**
- * Format distance for display
- */
-export function formatDistance(distance: number, unit: "km" | "miles" = "km"): string {
-  const convertedDistance = unit === "miles" ? distance * 0.621371 : distance;
-
-  if (convertedDistance < 1) {
-    return `${Math.round(convertedDistance * 1000)} m`;
-  }
-
-  return `${convertedDistance.toFixed(2)} ${unit}`;
-}
-
-/**
- * Format duration for display
- */
-export function formatDuration(milliseconds: number): string {
-  const seconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}:${(minutes % 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${(seconds % 60).toString().padStart(2, "0")}`;
-}
-
-/**
- * Format speed for display
- */
-export function formatSpeed(speed: number, unit: "kmh" | "mph" = "kmh"): string {
-  const convertedSpeed = unit === "mph" ? speed * 0.621371 : speed;
-  return `${convertedSpeed.toFixed(1)} ${unit}`;
-}
-
-/**
- * Format pace for display
- */
-export function formatPace(pace: number, unit: "min/km" | "min/mile" = "min/km"): string {
-  const convertedPace = unit === "min/mile" ? pace / 0.621371 : pace;
-  const minutes = Math.floor(convertedPace);
-  const seconds = Math.round((convertedPace - minutes) * 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")} ${unit}`;
-}
-
-/**
- * Generate a unique color for an activity
- */
-export function generateActivityColor(index: number, palette = "default"): string {
-  const palettes = {
-    default: ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"],
-    vibrant: ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"],
-    pastel: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#FFD1DC", "#E0BBE4"],
-    nature: ["#2E8B57", "#8FBC8F", "#228B22", "#32CD32", "#9ACD32", "#6B8E23"],
-  };
-
-  const colors = palettes[palette as keyof typeof palettes] || palettes.default;
-  return colors[index % colors.length];
-}
-
-/**
- * Validate coordinates
+ * Validate if a coordinate is within valid ranges
+ * @param lat - Latitude value
+ * @param lng - Longitude value
+ * @returns Boolean indicating if coordinates are valid
  */
 export function isValidCoordinate(lat: number, lng: number): boolean {
   return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -674,24 +633,34 @@ export function isValidCoordinate(lat: number, lng: number): boolean {
 
 /**
  * Clamp a value between min and max
+ * @param value - The value to clamp
+ * @param min - Minimum allowed value
+ * @param max - Maximum allowed value
+ * @returns The clamped value
  */
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
 /**
- * Generate a slug from a string
+ * Generate a URL-friendly slug from a string
+ * @param text - Input text to convert to slug
+ * @returns URL-friendly slug
  */
 export function generateSlug(text: string): string {
   return text
+    .toString()
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^\w\s-]/g, "") // Remove special chars
+    .trim()
+    .replace(/\s+/g, "-") // Replace spaces with -
+    .replace(/--+/g, "-"); // Replace multiple - with single -
 }
 
 /**
  * Deep clone an object
+ * @param obj - The object to clone
+ * @returns A deep clone of the object
  */
 export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));

@@ -1,43 +1,189 @@
 import type { Id } from "../_generated/dataModel";
+import type { DataModel } from "../_generated/dataModel";
 
 // ============================================================================
-// Core Entity Types (will be properly typed after schema generation)
+// Database Table Names
 // ============================================================================
 
-// These will be properly typed once the schema is generated
-export type User = Record<string, unknown>;
-export type Journey = Record<string, unknown>;
-export type Activity = Record<string, unknown>;
-export type ExportTemplate = Record<string, unknown>;
-export type GeneratedExport = Record<string, unknown>;
-export type AIAnalysis = Record<string, unknown>;
-export type UserSession = Record<string, unknown>;
-export type SystemLog = Record<string, unknown>;
+/** All valid table names in the database */
+export type TableName = keyof DataModel;
 
-// ActivityPoint needs proper typing for calculations
-export interface ActivityPoint {
-  activityId: Id<"activities">;
-  pointIndex: number;
-  latitude: number;
-  longitude: number;
-  elevation?: number;
-  timestamp?: number;
-  speed?: number;
-  heartRate?: number;
-  cadence?: number;
-  power?: number;
-  temperature?: number;
-}
+// ============================================================================
+// Core Document Types
+// ============================================================================
 
-// Extended types with relationships
+type Schema = DataModel;
+
+/** Utility to extract document type from table name */
+type DocumentType<T extends TableName> = Schema[T]["document"] & { _id: Id<T> };
+
+// Core document types
+export type User = DocumentType<"users">;
+export type Journey = DocumentType<"journeys">;
+export type Activity = DocumentType<"activities">;
+export type ActivityPoint = DocumentType<"activityPoints">;
+export type ExportTemplate = DocumentType<"exportTemplates">;
+export type GeneratedExport = DocumentType<"generatedExports">;
+
+// ============================================================================
+// Document Types (with IDs) - Using DocumentType utility
+// ============================================================================
+
+// All document types are now defined above using DocumentType<T>
+// Example: export type User = DocumentType<"users">;
+
+// Remove duplicate type declarations and use the ones from above
+
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+/** A document with its ID */
+export type DocumentWithId<T extends TableName> = DocumentType<T>;
+
+/** Type for document creation (omits system fields) */
+export type CreateInput<T extends TableName> = Omit<Schema[T]["document"], "_id" | "_creationTime">;
+
+/** Type for document updates (makes all fields optional and omits system fields) */
+export type UpdateInput<T extends TableName> = Partial<CreateInput<T>> & {
+  _id: Id<T>;
+};
+
+/** Type for document fields that can be updated */
+export type UpdatableFields<T extends TableName> = Omit<UpdateInput<T>, "_id">;
+
+// ============================================================================
+// Input Types (for mutations)
+// ============================================================================
+
+/** Input type for creating a new user */
+export type CreateUserInput = CreateInput<"users">;
+
+/** Input type for updating a user */
+export type UpdateUserInput = UpdateInput<"users">;
+
+/** Input type for creating a new journey */
+export type CreateJourneyInput = Omit<
+  CreateInput<"journeys">,
+  "createdAt" | "updatedAt" | "lastActivityDate"
+>;
+
+/** Input type for updating a journey */
+export type UpdateJourneyInput = UpdateInput<"journeys"> & {
+  lastActivityDate?: number;
+};
+
+/** Input type for creating a new activity */
+export type CreateActivityInput = Omit<
+  CreateInput<"activities">,
+  "createdAt" | "updatedAt" | "processingStatus" | "processingError"
+>;
+
+/** Input type for updating an activity */
+export type UpdateActivityInput = UpdateInput<"activities"> & {
+  processingStatus?: ProcessingStatus;
+  processingError?: string;
+};
+
+/** Input type for creating activity points */
+export type CreateActivityPointInput = Omit<CreateInput<"activityPoints">, "pointIndex">;
+
+/** Input type for creating export templates */
+export type CreateExportTemplateInput = CreateInput<"exportTemplates">;
+
+/** Input type for updating export templates */
+export type UpdateExportTemplateInput = UpdateInput<"exportTemplates">;
+
+/** Input type for creating generated exports */
+export type CreateGeneratedExportInput = CreateInput<"generatedExports">;
+
+/** Input type for updating generated exports */
+export type UpdateGeneratedExportInput = UpdateInput<"generatedExports">;
+
+// ============================================================================
+// Query Result Types
+// ============================================================================
+
+/** Journey with its activities */
 export type JourneyWithActivities = Journey & {
   activities: Activity[];
   activityCount: number;
 };
 
+/** Activity with its points */
 export type ActivityWithPoints = Activity & {
   points: ActivityPoint[];
 };
+
+// ============================================================================
+// Enums and Constants
+// ============================================================================
+
+/** Visibility levels for journeys and activities */
+export const VisibilityLevel = {
+  PRIVATE: "private",
+  UNLISTED: "unlisted",
+  PUBLIC: "public",
+} as const;
+
+export type VisibilityLevel = (typeof VisibilityLevel)[keyof typeof VisibilityLevel];
+
+/** Activity types */
+export const ActivityType = {
+  HIKING: "hiking",
+  RUNNING: "running",
+  CYCLING: "cycling",
+  WALKING: "walking",
+  SWIMMING: "swimming",
+  SKIING: "skiing",
+  SNOWBOARDING: "snowboarding",
+  KAYAKING: "kayaking",
+  PADDLING: "paddling",
+  OTHER: "other",
+} as const;
+
+export type ActivityType = (typeof ActivityType)[keyof typeof ActivityType];
+
+/** Processing status for async operations */
+export const ProcessingStatus = {
+  PENDING: "pending",
+  PROCESSING: "processing",
+  COMPLETED: "completed",
+  FAILED: "failed",
+} as const;
+
+export type ProcessingStatus = (typeof ProcessingStatus)[keyof typeof ProcessingStatus];
+
+/** Export template categories */
+export const ExportTemplateCategory = {
+  SOCIAL: "social",
+  PRINT: "print",
+  CUSTOM: "custom",
+} as const;
+
+export type ExportTemplateCategory =
+  (typeof ExportTemplateCategory)[keyof typeof ExportTemplateCategory];
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/** Type guard to check if a value is a valid table name */
+export function isTableName(value: string): value is TableName {
+  return [
+    "users",
+    "journeys",
+    "activities",
+    "activityPoints",
+    "exportTemplates",
+    "generatedExports",
+  ].includes(value);
+}
+
+/** Type guard to check if a document has an ID */
+export function hasId<T>(doc: T | { _id: Id<TableName> }): doc is { _id: Id<TableName> } {
+  return doc !== null && typeof doc === "object" && "_id" in doc && doc._id !== undefined;
+}
 
 // ============================================================================
 // GPX and Geospatial Types
@@ -133,7 +279,13 @@ export interface RouteSimplificationOptions {
   preserveTimestamps?: boolean;
 }
 
-export type DistanceCalculationMethod = "haversine" | "euclidean";
+export const DistanceCalculationMethod = {
+  HAVERSINE: "haversine",
+  EUCLIDEAN: "euclidean",
+} as const;
+
+export type DistanceCalculationMethod =
+  (typeof DistanceCalculationMethod)[keyof typeof DistanceCalculationMethod];
 
 export interface ElevationProfile {
   points: Array<{
@@ -246,35 +398,34 @@ export interface WeatherData {
   icon: string;
 }
 
-export type ActivityType =
-  | "hiking"
-  | "running"
-  | "cycling"
-  | "walking"
-  | "skiing"
-  | "snowboarding"
-  | "climbing"
-  | "kayaking"
-  | "sailing"
-  | "motorcycle"
-  | "driving"
-  | "other";
-
-export type ProcessingStatus = "pending" | "processing" | "completed" | "failed";
+// ActivityType and ProcessingStatus are now defined in the Enums and Constants section
+// Remove these duplicate declarations to use the ones with string literals from the enums
 
 // ============================================================================
 // Map and Visualization Types
 // ============================================================================
 
-export type MapStyle = "light" | "dark" | "outdoors" | "terrain" | "satellite" | "custom";
+export const MapStyle = {
+  LIGHT: "light",
+  DARK: "dark",
+  OUTDOORS: "outdoors",
+  TERRAIN: "terrain",
+  SATELLITE: "satellite",
+  CUSTOM: "custom",
+} as const;
 
-export type ColorPalette =
-  | "default"
-  | "vibrant"
-  | "pastel"
-  | "monochrome"
-  | "colorblind-friendly"
-  | "custom";
+export type MapStyle = (typeof MapStyle)[keyof typeof MapStyle];
+
+export const ColorPalette = {
+  DEFAULT: "default",
+  VIBRANT: "vibrant",
+  PASTEL: "pastel",
+  MONOCHROME: "monochrome",
+  COLORBLIND_FRIENDLY: "colorblind-friendly",
+  CUSTOM: "custom",
+} as const;
+
+export type ColorPalette = (typeof ColorPalette)[keyof typeof ColorPalette];
 
 export interface MapConfig {
   style: MapStyle;
@@ -326,7 +477,15 @@ export interface TemplateData {
   layers: CanvasLayer[];
 }
 
-export type ExportFormat = "png" | "jpeg" | "webp" | "svg" | "pdf";
+export const ExportFormat = {
+  PNG: "png",
+  JPEG: "jpeg",
+  WEBP: "webp",
+  SVG: "svg",
+  PDF: "pdf",
+} as const;
+
+export type ExportFormat = (typeof ExportFormat)[keyof typeof ExportFormat];
 
 export interface ExportDimensions {
   width: number;
@@ -412,8 +571,10 @@ export interface PointOfInterest {
 // Sharing and Privacy Types
 // ============================================================================
 
-export type VisibilityLevel = "public" | "unlisted" | "private";
-export type ShareType = "public" | "unlisted" | "password";
+// VisibilityLevel is defined in the Enums and Constants section
+// Remove this duplicate declaration to use the one with string literals from the enum
+// Reuse VisibilityLevel for sharing types
+export type ShareType = VisibilityLevel | "password";
 
 export interface SharePermissions {
   canView: boolean;
