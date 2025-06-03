@@ -35,9 +35,9 @@ const JourneyHeader = ({ journey }: JourneyHeaderProps) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-start w-full md:max-w-7xl mx-auto justify-between  gap-2 md:gap-0">
+    <div className="flex flex-col md:flex-row  w-full md:max-w-7xl mx-auto md:items-center  justify-between  gap-2 md:gap-0">
       {/* Left: Title, Description, Badges */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         <span className="flex flex-col">
           <h1 className="text-2xl md:text-2xl font-bold tracking-tight truncate leading-tight">
             {journey.title}
