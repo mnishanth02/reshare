@@ -19,7 +19,7 @@ export const JourneyCustomizationPanel = ({
       className={`transition-all duration-300 ${isPanelVisible ? "" : "max-w-[60px]"} flex flex-col p-0 h-full`}
     >
       <CardHeader
-        className="cursor-pointer hover:bg-muted/50 transition-colors border-b px-4 py-3"
+        className="cursor-pointer hover:bg-muted/50 transition-colors  px-4 py-2"
         onClick={onTogglePanel}
       >
         {isPanelVisible ? (

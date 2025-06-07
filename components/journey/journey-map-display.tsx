@@ -1,8 +1,7 @@
 "use client";
 
-import { MapIcon, Maximize2 } from "lucide-react";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { MapIcon } from "lucide-react";
+import { Card, CardContent } from "../ui/card";
 
 const MapPlaceholder = () => (
   <div className="h-full w-full rounded-lg bg-gradient-to-br from-muted to-muted/50 flex flex-col items-center justify-center text-muted-foreground px-6 relative overflow-hidden">
@@ -39,19 +38,9 @@ interface JourneyMapDisplayProps {
 export const JourneyMapDisplay = ({ layout }: JourneyMapDisplayProps) => {
   if (layout === "mobile") {
     return (
-      <Card className="py-3">
-        <CardHeader className="px-4">
-          <CardTitle className="text-lg flex items-center justify-between">
-            <span className="flex items-center">
-              <MapIcon className="h-5 w-5 mr-2 text-primary" /> Map
-            </span>
-            <Button variant="outline" size="sm">
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 m-0 py-0">
-          <div className="h-[300px]">
+      <Card className="p-0">
+        <CardContent className="p-0">
+          <div className="h-[450px]">
             <MapPlaceholder />
           </div>
         </CardContent>

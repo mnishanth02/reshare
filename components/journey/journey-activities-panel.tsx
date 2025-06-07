@@ -1,6 +1,7 @@
 "use client";
 
 import type { Doc } from "@/convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 import {
   Activity,
   Calendar,
@@ -131,7 +132,7 @@ export const JourneyActivitiesPanel = ({
 
   const headerClasses =
     layout === "desktop"
-      ? "cursor-pointer hover:bg-muted/50 transition-colors border-b px-4 py-3"
+      ? "cursor-pointer hover:bg-muted/50 transition-colors   px-4 py-2"
       : "cursor-pointer hover:bg-muted/50 transition-colors p-2 px-4";
 
   const titleClasses =
@@ -139,8 +140,8 @@ export const JourneyActivitiesPanel = ({
   const iconSize = layout === "desktop" ? "h-4 w-4" : "h-5 w-5";
 
   return (
-    <Card className={cardClasses}>
-      <CardHeader className={headerClasses} onClick={onTogglePanel}>
+    <Card className={cn(cardClasses)}>
+      <CardHeader className={cn(headerClasses)} onClick={onTogglePanel}>
         {layout === "mobile" && (
           <div className="flex justify-between items-center">
             <CardTitle className={titleClasses}>
@@ -157,7 +158,7 @@ export const JourneyActivitiesPanel = ({
         {layout === "desktop" &&
           (isPanelVisible ? (
             <div className="flex justify-between items-center">
-              <CardTitle className={titleClasses}>
+              <CardTitle className={cn(titleClasses, "")}>
                 <Activity className={`${iconSize} mr-2 text-primary`} />
                 Activities ({filteredActivities.length})
               </CardTitle>

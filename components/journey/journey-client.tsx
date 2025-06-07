@@ -65,7 +65,7 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
       <JourneyHeader journey={journey} />
 
       {/* Mobile Layout */}
-      <div className="block lg:hidden mt-4 space-y-4">
+      <div className="block lg:hidden mt-3 space-y-4">
         {/* Activities Section */}
         <JourneyActivitiesPanel
           allActivities={activities}
@@ -82,7 +82,7 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
 
       {/* Desktop Layout - Three Column */}
       <div
-        className="hidden lg:grid gap-4 mt-4 h-[calc(100vh-250px)] min-h-[600px]"
+        className="hidden lg:grid gap-3 mt-4 h-[calc(100vh-250px)] min-h-[600px]"
         style={{
           gridTemplateColumns: `
             ${showActivities ? "350px" : "50px"} 
