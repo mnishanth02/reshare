@@ -111,12 +111,12 @@ const JourneyHeader = ({ journey }: JourneyHeaderProps) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto animate-in fade-in duration-300">
-      <div className="p-3 bg-gradient-to-r from-background via-background to-muted/10 rounded-lg border shadow-sm hover:shadow-md transition-shadow duration-300">
+      <div className="py-2 px-3 bg-gradient-to-r from-background via-background to-muted/10 rounded-lg border shadow-sm hover:shadow-md transition-shadow duration-300">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           {/* Left Section: Title, Description, Badges */}
           <div className="flex-1 space-y-2">
             <div className="space-y-2">
-              <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-foreground leading-tight">
+              <h1 className="text-lg lg:text-xl font-bold tracking-tight text-foreground leading-tight">
                 {journey.title}
               </h1>
               {journey.description && (
@@ -131,20 +131,20 @@ const JourneyHeader = ({ journey }: JourneyHeaderProps) => {
               {journey.defaultActivityType && (
                 <Badge
                   variant="outline"
-                  className={`${getActivityTypeColor(journey.defaultActivityType)} font-medium px-3 py-1 text-sm transition-all  shadow-sm`}
+                  className={`${getActivityTypeColor(journey.defaultActivityType)} font-medium px-2 py-1 text-xs transition-all  shadow-sm`}
                 >
                   {journey.defaultActivityType.toUpperCase()}
                 </Badge>
               )}
               <Badge
                 variant="outline"
-                className={`${getStatusColor(journey.status)} font-medium px-3 py-1 text-sm transition-all  shadow-sm`}
+                className={`${getStatusColor(journey.status)} font-medium px-2 py-1 text-xs transition-all  shadow-sm`}
               >
                 {journey.status.toUpperCase()}
               </Badge>
               <Badge
                 variant="outline"
-                className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800 font-medium px-3 py-1 text-sm transition-all  shadow-sm"
+                className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800 font-medium px-2 py-1 text-xs transition-all  shadow-sm"
               >
                 <Calendar className="h-3 w-3 mr-1" />
                 {formatDate(journey.createdAt)}

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { mutation } from "../_generated/server";
+import { internalMutation, mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import {
   createJourneyValidator,
@@ -120,8 +120,8 @@ export const deleteJourney = mutation({
       }
 
       // Delete GPX file from storage if it exists
-      if (activity.gpxFileId) {
-        await ctx.storage.delete(activity.gpxFileId);
+      if (activity.gpxStorageId) {
+        await ctx.storage.delete(activity.gpxStorageId);
       }
 
       // Delete the activity
@@ -200,7 +200,7 @@ export const duplicate = mutation({
           description: activity.description,
           activityType: activity.activityType,
           originalFileName: activity.originalFileName,
-          gpxFileId: activity.gpxFileId, // Reference same file
+          gpxStorageId: activity.gpxStorageId, // Reference same file
           processedGeoJson: activity.processedGeoJson,
 
           // Copy statistics
@@ -212,8 +212,6 @@ export const duplicate = mutation({
           minElevation: activity.minElevation,
           avgSpeed: activity.avgSpeed,
           maxSpeed: activity.maxSpeed,
-          avgPace: activity.avgPace,
-          estimatedCalories: activity.estimatedCalories,
 
           // Copy visual properties
           color: activity.color,
@@ -222,8 +220,9 @@ export const duplicate = mutation({
 
           // Copy route data
           boundingBox: activity.boundingBox,
-          centerLat: activity.centerLat,
-          centerLng: activity.centerLng,
+          center: activity.center,
+          startTime: activity.startTime,
+          endTime: activity.endTime,
 
           // Copy dates and status
           activityDate: activity.activityDate,
@@ -332,8 +331,8 @@ export const bulkDelete = mutation({
             }
 
             // Delete GPX file from storage if it exists
-            if (activity.gpxFileId) {
-              await ctx.storage.delete(activity.gpxFileId);
+            if (activity.gpxStorageId) {
+              await ctx.storage.delete(activity.gpxStorageId);
             }
 
             // Delete the activity
@@ -398,7 +397,7 @@ async function recalculateJourneyStats(ctx: MutationCtx, journeyId: Id<"journeys
  * @param args - Journey ID to recalculate
  * @returns Updated statistics
  */
-export const recalculateStatistics = mutation({
+export const recalculateStatistics = internalMutation({
   args: journeyIdValidator,
   handler: async (ctx, args) => {
     const user = await getCurrentUserOrThrow(ctx);

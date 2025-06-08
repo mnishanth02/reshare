@@ -1,4 +1,5 @@
 import { JourneyClient } from "@/components/journey/journey-client";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Suspense } from "react";
 
 interface JourneyDetailsPageProps {
@@ -10,7 +11,7 @@ export default async function JourneyDetailsPage({ params }: JourneyDetailsPageP
 
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <JourneyClient journeyId={journeyId} />
+      <JourneyClient journeyId={journeyId as Id<"journeys">} />
     </Suspense>
   );
 }

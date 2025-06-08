@@ -80,7 +80,7 @@ export default defineSchema({
 
     // GPX data
     originalFileName: v.string(),
-    gpxFileId: v.id("_storage"),
+    gpxStorageId: v.optional(v.id("_storage")),
     processedGeoJson: v.optional(v.string()), // Stringified GeoJSON
 
     // Activity statistics
@@ -92,8 +92,6 @@ export default defineSchema({
     minElevation: v.optional(v.number()),
     avgSpeed: v.optional(v.number()), // m/s
     maxSpeed: v.optional(v.number()), // m/s
-    avgPace: v.optional(v.number()), // seconds per km
-    estimatedCalories: v.optional(v.number()),
 
     // Visual properties
     color: v.optional(v.string()),
@@ -109,22 +107,28 @@ export default defineSchema({
         west: v.number(),
       })
     ),
-
-    // Center point
-    centerLat: v.optional(v.number()),
-    centerLng: v.optional(v.number()),
+    center: v.optional(
+      v.object({
+        lat: v.number(),
+        lng: v.number(),
+      })
+    ),
 
     // Timestamps and dates
     activityDate: v.number(), // Date from GPX or user input
+    startTime: v.optional(v.number()), // ms timestamp
+    endTime: v.optional(v.number()), // ms timestamp
+
     createdAt: v.number(),
     updatedAt: v.number(),
 
     // Processing status
     processingStatus: v.union(
-      v.literal("pending"),
-      v.literal("processing"),
-      v.literal("completed"),
-      v.literal("failed")
+      v.literal("pending"), // Waiting to be processed
+      v.literal("uploading"), // Placeholder created, file is uploading
+      v.literal("processing"), // File uploaded, worker is parsing
+      v.literal("completed"), // All data is present and saved
+      v.literal("failed") // An error occurred
     ),
     processingError: v.optional(v.string()),
   })
@@ -150,140 +154,4 @@ export default defineSchema({
   })
     .index("by_activity_id", ["activityId"])
     .index("by_activity_point", ["activityId", "pointIndex"]),
-
-  // Export templates table
-  exportTemplates: defineTable({
-    userId: v.id("users"),
-    name: v.string(),
-    description: v.optional(v.string()),
-    category: v.string(), // social, print, custom
-
-    // Template configuration
-    config: v.string(), // Stringified JSON configuration
-    previewImageId: v.optional(v.id("_storage")),
-
-    // Template metadata
-    isPublic: v.optional(v.boolean()),
-    usageCount: v.optional(v.number()),
-
-    // Timestamps
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user_id", ["userId"])
-    .index("by_category", ["category"])
-    .index("by_public", ["isPublic"]),
-
-  // Generated exports table
-  generatedExports: defineTable({
-    userId: v.id("users"),
-    journeyId: v.id("journeys"),
-    activityIds: v.array(v.id("activities")),
-
-    // Export metadata
-    exportType: v.string(), // image, pdf, svg
-    format: v.string(), // png, jpeg, webp, pdf, svg
-    resolution: v.string(), // 1x, 2x, 3x, etc.
-    dimensions: v.object({
-      width: v.number(),
-      height: v.number(),
-    }),
-
-    // Template and styling
-    templateId: v.optional(v.id("exportTemplates")),
-    customConfig: v.optional(v.string()), // Stringified JSON
-
-    // Generated file
-    fileId: v.id("_storage"),
-    fileSize: v.optional(v.number()),
-
-    // Processing status
-    status: v.union(
-      v.literal("queued"),
-      v.literal("processing"),
-      v.literal("completed"),
-      v.literal("failed")
-    ),
-    error: v.optional(v.string()),
-
-    // Timestamps
-    createdAt: v.number(),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_user_id", ["userId"])
-    .index("by_journey_id", ["journeyId"])
-    .index("by_status", ["status"])
-    .index("by_created_at", ["createdAt"]),
-
-  // AI analysis results
-  aiAnalysis: defineTable({
-    userId: v.id("users"),
-    targetId: v.string(), // Can be journeyId or activityId
-    targetType: v.union(v.literal("journey"), v.literal("activity")),
-
-    // Analysis type and results
-    analysisType: v.string(), // route_analysis, difficulty_assessment, poi_detection, etc.
-    results: v.string(), // Stringified JSON results
-    confidence: v.optional(v.number()),
-
-    // AI model information
-    model: v.string(),
-    version: v.optional(v.string()),
-
-    // Timestamps
-    createdAt: v.number(),
-    expiresAt: v.optional(v.number()), // For caching
-  })
-    .index("by_target", ["targetId", "targetType"])
-    .index("by_analysis_type", ["analysisType"])
-    .index("by_user_id", ["userId"])
-    .index("by_expires_at", ["expiresAt"]),
-
-  // User sessions for tracking active editing sessions
-  userSessions: defineTable({
-    userId: v.id("users"),
-    journeyId: v.optional(v.id("journeys")),
-
-    // Session data
-    sessionId: v.string(),
-    lastActivity: v.number(),
-    currentView: v.optional(v.string()), // dashboard, journey, editor
-
-    // Editor state (if applicable)
-    editorState: v.optional(v.string()), // Stringified JSON
-
-    // Device information
-    userAgent: v.optional(v.string()),
-    ipAddress: v.optional(v.string()),
-
-    // Timestamps
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user_id", ["userId"])
-    .index("by_session_id", ["sessionId"])
-    .index("by_last_activity", ["lastActivity"]),
-
-  // System logs for monitoring
-  systemLogs: defineTable({
-    level: v.union(v.literal("info"), v.literal("warn"), v.literal("error")),
-    category: v.string(), // gpx_processing, ai_analysis, export_generation, etc.
-    message: v.string(),
-
-    // Context data
-    userId: v.optional(v.id("users")),
-    journeyId: v.optional(v.id("journeys")),
-    activityId: v.optional(v.id("activities")),
-
-    // Additional metadata
-    metadata: v.optional(v.string()), // Stringified JSON
-    stack: v.optional(v.string()),
-
-    // Timestamps
-    timestamp: v.number(),
-  })
-    .index("by_level", ["level"])
-    .index("by_category", ["category"])
-    .index("by_timestamp", ["timestamp"])
-    .index("by_user_id", ["userId"]),
 });

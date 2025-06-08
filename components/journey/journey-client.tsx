@@ -13,7 +13,7 @@ import JourneyHeader from "./journey-header";
 import { JourneyMapDisplay } from "./journey-map-display";
 
 interface JourneyClientProps {
-  journeyId: string;
+  journeyId: Id<"journeys">;
 }
 
 export function JourneyClient({ journeyId }: JourneyClientProps) {
@@ -61,13 +61,14 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
   const activities = journey.activities || [];
 
   return (
-    <div className="px-6 py-2 w-full mx-auto">
+    <div className="px-5 py-2 w-full mx-auto">
       <JourneyHeader journey={journey} />
 
       {/* Mobile Layout */}
-      <div className="block lg:hidden mt-3 space-y-4">
+      <div className="block lg:hidden space-y-4">
         {/* Activities Section */}
         <JourneyActivitiesPanel
+          journeyId={journey._id}
           allActivities={activities}
           selectedActivityId={selectedActivity}
           onActivitySelect={setSelectedActivity}
@@ -82,18 +83,19 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
 
       {/* Desktop Layout - Three Column */}
       <div
-        className="hidden lg:grid gap-3 mt-4 h-[calc(100vh-250px)] min-h-[600px]"
+        className="hidden lg:grid gap-3 mt-3 h-[calc(100vh-250px)] min-h-[600px]"
         style={{
           gridTemplateColumns: `
-            ${showActivities ? "350px" : "50px"} 
+            ${showActivities ? "350px" : "45px"} 
             1fr 
-            ${showCustomization ? "350px" : "50px"}
+            ${showCustomization ? "350px" : "45px"}
           `,
-          transition: "grid-template-columns 0.3s ease",
+          transition: "grid-template-columns 0.2s ease",
         }}
       >
         {/* Column 1: Activities (Collapsible) */}
         <JourneyActivitiesPanel
+          journeyId={journey._id}
           allActivities={activities}
           selectedActivityId={selectedActivity}
           onActivitySelect={setSelectedActivity}

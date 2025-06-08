@@ -22,8 +22,6 @@ export type User = DocumentType<"users">;
 export type Journey = DocumentType<"journeys">;
 export type Activity = DocumentType<"activities">;
 export type ActivityPoint = DocumentType<"activityPoints">;
-export type ExportTemplate = DocumentType<"exportTemplates">;
-export type GeneratedExport = DocumentType<"generatedExports">;
 
 // ============================================================================
 // Document Types (with IDs) - Using DocumentType utility
@@ -87,18 +85,6 @@ export type UpdateActivityInput = UpdateInput<"activities"> & {
 
 /** Input type for creating activity points */
 export type CreateActivityPointInput = Omit<CreateInput<"activityPoints">, "pointIndex">;
-
-/** Input type for creating export templates */
-export type CreateExportTemplateInput = CreateInput<"exportTemplates">;
-
-/** Input type for updating export templates */
-export type UpdateExportTemplateInput = UpdateInput<"exportTemplates">;
-
-/** Input type for creating generated exports */
-export type CreateGeneratedExportInput = CreateInput<"generatedExports">;
-
-/** Input type for updating generated exports */
-export type UpdateGeneratedExportInput = UpdateInput<"generatedExports">;
 
 // ============================================================================
 // Query Result Types
