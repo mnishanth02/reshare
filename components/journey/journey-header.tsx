@@ -110,8 +110,8 @@ const JourneyHeader = ({ journey }: JourneyHeaderProps) => {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto animate-in fade-in duration-300">
-      <div className="py-2 px-3 bg-gradient-to-r from-background via-background to-muted/10 rounded-lg border shadow-sm hover:shadow-md transition-shadow duration-300">
+    <div className="w-full mx-auto animate-in fade-in duration-300">
+      <div className="py-3 px-12 bg-gradient-to-r from-background via-background to-muted/10 rounded-lg border shadow-sm hover:shadow-md transition-shadow duration-300">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           {/* Left Section: Title, Description, Badges */}
           <div className="flex-1 space-y-2">
