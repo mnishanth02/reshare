@@ -160,7 +160,9 @@ export const getJourney = query({
     const user = await getCurrentUser(ctx);
 
     const journey = await ctx.db.get(args.journeyId);
+    console.log("Journey", journey);
     if (!journey) {
+      console.log("Journey not found");
       return null;
     }
 
