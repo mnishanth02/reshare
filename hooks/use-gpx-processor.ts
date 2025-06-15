@@ -2,75 +2,35 @@
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { useMutation } from "convex/react";
-// For professional GeoJSON typing, install with: npm install -D @types/geojson
-import type { Feature, LineString, MultiPoint } from "geojson";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_FILE_SIZE } from "@/lib/constants";
+import { logger } from "@/lib/logger";
+import { useAction, useMutation } from "convex/react";
+import { useCallback, useState } from "react";
 
 // ==================================
 // TYPE DEFINITIONS ("The Contract")
 // ==================================
 // This section defines the structure of the data we expect back from the
-// gpxProcessor.js worker. It's crucial to keep this in sync with the
-// object returned by the worker's `processPoints` function.
-
-interface TrackPoint {
-  latitude: number;
-  longitude: number;
-  elevation?: number;
-  timestamp?: number;
-}
-
-interface ActivityStats {
-  distance: number;
-  duration: number;
-  elevationGain: number;
-  elevationLoss: number;
-  maxElevation: number;
-  minElevation: number;
-  avgSpeed: number;
-  maxSpeed: number;
-  startTime?: number;
-  endTime?: number;
-  boundingBox: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  };
-  center: {
-    lat: number;
-    lng: number;
-  };
-}
-
-/**
- * The shape of the entire data object returned by the worker on success.
- * This must match the `saveProcessedActivity` mutation's `processedData` argument.
- */
-interface ParsedActivityData {
-  name: string;
-  points: TrackPoint[];
-  stats: ActivityStats;
-  geoJson: Feature<LineString | MultiPoint>;
-}
+// Convex action. Processing is now done server-side.
 
 // --- Status types for the UI ---
 
+// Type definitions are clear and effective.
 export type ProcessingStatus =
-  | "pending"
-  | "uploading"
-  | "processing"
-  | "saving"
-  | "completed"
-  | "failed";
+  | "pending" // Waiting in the queue
+  | "creating" // Creating placeholder in DB
+  | "uploading" // Uploading to file storage
+  | "processing" // Convex action is running
+  | "completed" // Action finished successfully
+  | "failed"; // An error occurred
 
 export interface FileProcessingState {
-  fileId: string; // A unique ID for the client-side process
+  fileId: string; // Unique client-side ID for this upload job
+  file: File;
   fileName: string;
-  status: "pending" | "creating" | "processing" | "saving" | "completed" | "failed";
+  status: ProcessingStatus;
   error?: string;
-  activityId?: Id<"activities">; // The ID of the document in Convex
+  activityId?: Id<"activities">;
 }
 
 // ==================================
@@ -81,26 +41,18 @@ export interface FileProcessingState {
  * A custom hook to manage file processing using a web worker and saving to Convex.
  * Implements a "create-then-update" pattern for a responsive UI.
  * @param journeyId - The ID of the journey to associate activities with.
+ * @param defaultActivityType - The default activity type to use for all files.
  */
-export function useGPXProcessor(journeyId: Id<"journeys">) {
+export function useGPXProcessor(journeyId: Id<"journeys">, defaultActivityType = "hiking") {
   const [processingStates, setProcessingStates] = useState<Map<string, FileProcessingState>>(
     new Map()
   );
-  const workerRef = useRef<Worker | null>(null);
 
-  // --- REFACTORED MUTATIONS ---
+  // --- CONVEX MUTATIONS AND ACTIONS ---
   const createPlaceholder = useMutation(api.activities.mutations.createPlaceholder);
-  const saveProcessedActivity = useMutation(api.activities.mutations.saveProcessedActivity);
-  const failProcessing = useMutation(api.activities.mutations.failProcessing);
+  const processActivityFileAction = useAction(api.activities.actions.processActivityFile);
+  const failProcessing = useMutation(api.activities.mutations.markProcessingFailed);
   const generateUploadUrl = useMutation(api.storage.mutations.generateUploadUrl);
-
-  // Worker setup (no changes needed, it's correct)
-  useEffect(() => {
-    const worker = new Worker(new URL("../public/workers/gpxProcessor.js", import.meta.url));
-    workerRef.current = worker;
-    // The onmessage handler will be managed by the processing function's promise
-    return () => worker.terminate();
-  }, []);
 
   const updateState = useCallback((fileId: string, updates: Partial<FileProcessingState>) => {
     setProcessingStates((prev) => {
@@ -113,101 +65,257 @@ export function useGPXProcessor(journeyId: Id<"journeys">) {
     });
   }, []);
 
-  // --- CORE PROCESSING LOGIC (REWRITTEN) ---
+  // --- CORE PROCESSING LOGIC (SIMPLIFIED FOR CONVEX ACTIONS) ---
 
-  const processSingleFile = async (file: File, fileId: string) => {
-    let activityId: Id<"activities"> | undefined;
+  const processSingleFile = useCallback(
+    async (file: File, fileId: string) => {
+      let activityId: Id<"activities"> | undefined;
+      const startTime = performance.now();
 
-    try {
-      // ===== STEP 1: CREATE PLACEHOLDER IN CONVEX =====
-      updateState(fileId, { status: "creating" });
-      activityId = await createPlaceholder({
+      logger.info(`Starting to process file: ${file.name}`, {
+        fileId,
         journeyId,
-        originalFileName: file.name,
-        activityType: "hiking", // TODO: Make this selectable
+        fileSize: file.size,
+        fileType: file.type,
       });
-      updateState(fileId, { status: "processing", activityId });
 
-      // ===== STEP 2: UPLOAD & PROCESS IN PARALLEL =====
-      const uploadPromise = (async () => {
-        const uploadUrl = await generateUploadUrl();
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
+      try {
+        // ===== STEP 1: CREATE PLACEHOLDER IN CONVEX =====
+        updateState(fileId, { status: "creating" });
+        logger.debug("Creating placeholder in Convex", { fileId, status: "creating" });
+
+        activityId = await createPlaceholder({
+          journeyId,
+          originalFileName: file.name,
+          activityType: defaultActivityType,
         });
-        if (!result.ok) throw new Error(`Upload failed with status: ${result.status}`);
-        const { storageId } = await result.json();
-        return storageId as Id<"_storage">;
-      })();
 
-      const workerPromise = new Promise((resolve, reject) => {
-        if (!workerRef.current) return reject(new Error("Worker not initialized."));
-        const timeout = setTimeout(() => reject(new Error("Processing timed out.")), 30000);
+        logger.success("Placeholder created successfully", {
+          fileId,
+          activityId,
+          status: "uploading",
+        });
+        updateState(fileId, { status: "uploading", activityId });
 
-        const handleMessage = (event: MessageEvent) => {
-          if (event.data.fileId === fileId) {
-            clearTimeout(timeout);
-            workerRef.current?.removeEventListener("message", handleMessage);
-            if (event.data.success) {
-              resolve(event.data.data);
-            } else {
-              reject(new Error(event.data.error));
-            }
+        // ===== STEP 2: UPLOAD FILE =====
+        logger.debug("Generating upload URL", { fileId });
+        const uploadUrl = await generateUploadUrl();
+
+        // Determine appropriate content type based on file extension
+        const getContentType = (fileName: string): string => {
+          const ext = fileName.toLowerCase().split(".").pop();
+          switch (ext) {
+            case "gpx":
+              return "application/gpx+xml";
+            case "tcx":
+              return "application/vnd.garmin.tcx+xml";
+            case "fit":
+              return "application/vnd.ant.fit";
+            case "kml":
+              return "application/vnd.google-earth.kml+xml";
+            case "kmz":
+              return "application/vnd.google-earth.kmz";
+            default:
+              return file.type || "application/octet-stream";
           }
         };
-        workerRef.current.addEventListener("message", handleMessage);
-        workerRef.current.postMessage({ file, fileId });
-      });
 
-      const [gpxStorageId, processedData] = await Promise.all([uploadPromise, workerPromise]);
+        const contentType = getContentType(file.name);
 
-      // ===== STEP 3: SAVE FINAL DATA TO CONVEX =====
-      updateState(fileId, { status: "saving" });
-      await saveProcessedActivity({
-        activityId,
-        gpxStorageId,
-        // The structure of `processedData` must match the mutation args
-        processedData: processedData as ParsedActivityData,
-      });
+        logger.debug("Uploading file to storage", {
+          fileId,
+          contentType,
+          size: file.size,
+        });
 
-      updateState(fileId, { status: "completed" });
-    } catch (e) {
-      console.error(`Failed to process ${file.name}:`, e);
-      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-      updateState(fileId, { status: "failed", error: errorMessage });
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": contentType,
+          },
+          body: file,
+        });
 
-      // If we managed to create a placeholder, mark it as failed in the DB
-      if (activityId) {
-        await failProcessing({ activityId, error: errorMessage });
+        if (!result.ok) {
+          const errorText = await result.text();
+          throw new Error(`Upload failed with status: ${result.status}, ${errorText}`);
+        }
+
+        const { storageId } = await result.json();
+        logger.success("File uploaded successfully", { fileId, storageId });
+
+        // ===== STEP 3: PROCESS FILE WITH CONVEX ACTION =====
+        updateState(fileId, { status: "processing" });
+        logger.debug("Processing file with Convex action", { fileId, activityId });
+
+        const actionResult = await processActivityFileAction({
+          storageId,
+          fileExtension: file.name.split(".").pop() || "",
+          activityId,
+        });
+
+        if (!actionResult.success) {
+          throw new Error(actionResult.error || "Backend processing failed.");
+        }
+
+        const totalTime = performance.now() - startTime;
+
+        logger.success("Activity processed and saved successfully", {
+          fileId,
+          activityId,
+          totalProcessingTime: `${(totalTime / 1000).toFixed(2)}s`,
+        });
+
+        updateState(fileId, { status: "completed" });
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
+        const totalTime = performance.now() - startTime;
+
+        logger.error(`Failed to process file: ${file.name}`, {
+          fileId,
+          activityId,
+          error: errorMessage,
+          timeElapsed: `${(totalTime / 1000).toFixed(2)}s`,
+          stack: e instanceof Error ? e.stack : undefined,
+        });
+
+        updateState(fileId, { status: "failed", error: errorMessage });
+
+        // If we managed to create a placeholder, mark it as failed in the DB
+        if (activityId) {
+          try {
+            await failProcessing({ activityId, error: errorMessage });
+            logger.warn("Marked activity as failed in database", { activityId, fileId });
+          } catch (dbError) {
+            logger.error("Failed to mark activity as failed in database", {
+              activityId,
+              fileId,
+              error: dbError instanceof Error ? dbError.message : String(dbError),
+            });
+          }
+        }
       }
-    }
-  };
+    },
+    [
+      journeyId,
+      defaultActivityType,
+      createPlaceholder,
+      processActivityFileAction,
+      failProcessing,
+      generateUploadUrl,
+      updateState,
+    ]
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   const processFiles = useCallback(
-    async (files: FileList) => {
+    async (files: FileList): Promise<void> => {
+      logger.info(`Processing ${files.length} file(s)`, {
+        journeyId,
+        fileCount: files.length,
+        fileNames: Array.from(files)
+          .map((f) => f.name)
+          .join(", "),
+      });
+
+      if (files.length === 0) {
+        logger.warn("No files provided for processing");
+        return;
+      }
+
       const fileArray = Array.from(files);
       const initialStates = new Map<string, FileProcessingState>();
       const filesToProcess: { file: File; fileId: string }[] = [];
 
+      // Prepare files for processing
       for (const file of fileArray) {
+        // Validate file before processing
+        if (file.size === 0) {
+          logger.error("File is empty", { fileName: file.name });
+          continue;
+        }
+
+        if (file.size > MAX_FILE_SIZE.GPX) {
+          // 50MB limit
+          logger.error("File too large", { fileName: file.name, size: file.size });
+          continue;
+        }
+
+        // Validate file extension
+        const validExtensions = ["gpx", "tcx", "fit", "kml", "kmz"];
+        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+        if (!fileExtension || !validExtensions.includes(fileExtension)) {
+          logger.error("Invalid file extension", {
+            fileName: file.name,
+            extension: fileExtension,
+            validExtensions: validExtensions.join(", "),
+          });
+          continue;
+        }
+
         // Create a unique ID for this specific upload+process job
-        const fileId = `${file.name}-${Date.now()}-${Math.random()}`;
-        initialStates.set(fileId, { fileId, fileName: file.name, status: "pending" });
+        const fileId = `${file.name}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+        logger.debug("Preparing file for processing", {
+          fileId,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        });
+
+        initialStates.set(fileId, {
+          fileId,
+          file,
+          fileName: file.name,
+          status: "pending",
+        });
+
         filesToProcess.push({ file, fileId });
       }
 
-      setProcessingStates(
-        (prev) => new Map([...Array.from(prev.entries()), ...Array.from(initialStates.entries())])
-      );
+      // Update the state with all files in pending state
+      logger.debug("Setting initial processing states", {
+        fileCount: filesToProcess.length,
+        fileIds: filesToProcess.map((f) => f.fileId).join(", "),
+      });
 
-      // Don't block the UI. Process each file independently.
-      for (const { file, fileId } of filesToProcess) {
-        processSingleFile(file, fileId);
+      setProcessingStates(initialStates);
+
+      // Process files in parallel
+      logger.info("Starting parallel processing of files", {
+        fileCount: filesToProcess.length,
+        fileNames: filesToProcess.map((f) => f.file.name).join(", "),
+      });
+
+      try {
+        await Promise.all(
+          filesToProcess.map(({ file, fileId }) =>
+            processSingleFile(file, fileId).catch((error) => {
+              logger.error(`Error in parallel processing of file ${file.name}`, {
+                fileId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              // Re-throw to maintain error propagation
+              throw error;
+            })
+          )
+        );
+
+        logger.success("All files processed successfully", {
+          fileCount: filesToProcess.length,
+          journeyId,
+        });
+      } catch (error) {
+        logger.error("Error during parallel file processing", {
+          error: error instanceof Error ? error.message : String(error),
+          filesProcessed: filesToProcess.length,
+          journeyId,
+        });
+        // Re-throw to allow error handling by the caller
+        throw error;
       }
     },
-    [journeyId, createPlaceholder, saveProcessedActivity, failProcessing, generateUploadUrl]
+    [processSingleFile] // Only include stable dependencies
   );
 
   // --- UTILITY FUNCTIONS ---

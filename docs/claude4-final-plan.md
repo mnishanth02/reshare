@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-**Reshare** is a web application designed to empower users to capture, customize, and share their real-world journeys as visually engaging images and interactive experiences. By transforming GPX activity data into interactive maps and static shareable graphics, Reshare offers a seamless, intuitive experience from journey upload to social media sharing. This document outlines the complete functional specifications, user workflows, non-functional requirements, and finalized technology stack incorporating modern alternatives and cost-effective solutions.
+**Reshare** is a web application designed to empower athletes to capture, customize, and share their real-world journeys as visually engaging images and interactive experiences. By transforming GPX activity data into interactive maps and static shareable graphics, Reshare offers a seamless, intuitive experience from journey upload to social media sharing. This document outlines the complete functional specifications, user workflows, non-functional requirements, and finalized technology stack incorporating modern alternatives and cost-effective solutions.
 
 ---
 

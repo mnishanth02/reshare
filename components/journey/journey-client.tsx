@@ -2,9 +2,10 @@
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 
 import { useState } from "react";
+import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Skeleton } from "../ui/skeleton";
 import { JourneyActivitiesPanel } from "./journey-activities-panel";
@@ -24,6 +25,22 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
   const journey = useQuery(api.journeys.queries.getJourney, {
     journeyId: journeyId as Id<"journeys">,
   });
+
+  const processActivityFileAction = useAction(api.activities.actions.processActivityFile);
+
+  //  write a fucntion to call
+
+  async function processActivityFile(
+    storageId: Id<"_storage">,
+    fileExtension: string,
+    activityId: Id<"activities">
+  ) {
+    await processActivityFileAction({
+      storageId: storageId as Id<"_storage">,
+      fileExtension,
+      activityId,
+    });
+  }
 
   if (journey === undefined) {
     return (
@@ -62,6 +79,17 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
 
   return (
     <div className="px-5 py-2 w-full mx-auto">
+      <Button
+        onClick={() =>
+          processActivityFile(
+            "kg287bx0vjmfbs89hbj4r9q4an7hwqx0" as Id<"_storage">,
+            "gpx",
+            "j57ekdjbvexhanvt0jyw9wew5h7hwc3p" as Id<"activities">
+          )
+        }
+      >
+        Process Activity File
+      </Button>
       <JourneyHeader journey={journey} />
 
       {/* Mobile Layout */}
@@ -86,8 +114,8 @@ export function JourneyClient({ journeyId }: JourneyClientProps) {
         className="hidden lg:grid gap-3 mt-3 h-[calc(100vh-250px)] min-h-[600px]"
         style={{
           gridTemplateColumns: `
-            ${showActivities ? "350px" : "45px"} 
-            1fr 
+            ${showActivities ? "350px" : "45px"}
+            1fr
             ${showCustomization ? "350px" : "45px"}
           `,
           transition: "grid-template-columns 0.2s ease",

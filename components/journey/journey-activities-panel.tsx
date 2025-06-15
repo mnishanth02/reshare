@@ -4,7 +4,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search } from "lucide-react";
 import { useState } from "react";
-import { GpxUploader } from "../common/gpx-uploader";
+import { ActivityUploader } from "../common/gpx-uploader";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import ActivityItem from "./activities/activity-item";
@@ -91,7 +91,7 @@ export const JourneyActivitiesPanel = ({
         <CardContent
           className={`
             ${layout === "desktop" ? "flex-1 flex flex-col px-4 space-y-3" : "space-y-3"}
-            ${layout === "mobile" ? "p-2" : ""} 
+            ${layout === "mobile" ? "p-2" : ""}
           `}
         >
           {/* Search bar */}
@@ -116,7 +116,7 @@ export const JourneyActivitiesPanel = ({
           >
             {allActivities.length === 0 ? (
               // Show prominent uploader when there are no activities
-              <GpxUploader journeyId={journeyId} />
+              <ActivityUploader journeyId={journeyId} />
             ) : filteredActivities.length === 0 ? (
               // Message for when search yields no results
               <div className="py-8 text-center text-muted-foreground">
@@ -143,7 +143,7 @@ export const JourneyActivitiesPanel = ({
               <h3 className="text-sm font-semibold text-muted-foreground mb-2">
                 Add another activity
               </h3>
-              <GpxUploader journeyId={journeyId} variant="minimal" />
+              <ActivityUploader journeyId={journeyId} variant="minimal" />
             </div>
           )}
         </CardContent>

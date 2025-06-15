@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { mutation, query } from "../_generated/server";
+import { internalMutation, mutation, query } from "../_generated/server";
 import { getCurrentUserOrThrow } from "../users";
 
 // =================================================================
@@ -13,6 +13,7 @@ export const createPlaceholder = mutation({
     originalFileName: v.string(),
     activityType: v.string(),
   },
+  returns: v.id("activities"),
   handler: async (ctx, args) => {
     const user = await getCurrentUserOrThrow(ctx);
 
@@ -34,15 +35,15 @@ export const createPlaceholder = mutation({
 
 // =================================================================
 // 2. UPDATE WITH PROCESSED DATA (THE "MONOLITHIC" UPDATE)
-// Called from the client hook after both upload and worker are done.
+// Called from the action after processing is complete - internal only.
 // =================================================================
-export const saveProcessedActivity = mutation({
+export const saveProcessedActivity = internalMutation({
   args: {
     activityId: v.id("activities"),
     gpxStorageId: v.id("_storage"),
     processedData: v.object({
       name: v.string(),
-      geoJson: v.any(), // GeoJSON is a complex object, v.any() is easiest
+      geoJson: v.any(), // GeoJSON Feature object
       stats: v.object({
         distance: v.number(),
         duration: v.number(),
@@ -65,12 +66,28 @@ export const saveProcessedActivity = mutation({
           lng: v.number(),
         }),
       }),
+      points: v.array(
+        v.object({
+          latitude: v.number(),
+          longitude: v.number(),
+          elevation: v.optional(v.number()),
+          timestamp: v.optional(v.number()),
+        })
+      ),
     }),
   },
+  returns: v.id("activities"),
   handler: async (ctx, args) => {
     const { activityId, gpxStorageId, processedData } = args;
-    const { geoJson, stats, name } = processedData;
+    const { geoJson, stats, name, points } = processedData;
 
+    // Validate that the activity exists and is still in processing state
+    const activity = await ctx.db.get(activityId);
+    if (!activity) {
+      throw new Error("Activity not found");
+    }
+
+    // Update the activity with processed data
     await ctx.db.patch(activityId, {
       gpxStorageId: gpxStorageId,
       processedGeoJson: JSON.stringify(geoJson),
@@ -88,47 +105,102 @@ export const saveProcessedActivity = mutation({
       startTime: stats.startTime,
       endTime: stats.endTime,
       // If the track has a valid start time, use it as the activity date
-      activityDate: stats.startTime ?? (await ctx.db.get(activityId))?.activityDate ?? Date.now(),
+      activityDate: stats.startTime ?? activity.activityDate ?? Date.now(),
       processingStatus: "completed",
       updatedAt: Date.now(),
     });
 
-    // Update journey-level stats in the background
-    const activity = await ctx.db.get(activityId);
-    if (activity) {
-      await ctx.scheduler.runAfter(0, internal.journeys.mutations.recalculateStatistics, {
-        journeyId: activity.journeyId,
-      });
+    // Store activity points if provided
+    if (points && points.length > 0) {
+      // Delete existing points if any (for reprocessing scenarios)
+      const existingPoints = await ctx.db
+        .query("activityPoints")
+        .withIndex("by_activity_id", (q) => q.eq("activityId", activityId))
+        .collect();
+
+      for (const point of existingPoints) {
+        await ctx.db.delete(point._id);
+      }
+
+      // Insert new points
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        await ctx.db.insert("activityPoints", {
+          activityId,
+          pointIndex: i,
+          latitude: point.latitude,
+          longitude: point.longitude,
+          elevation: point.elevation,
+          timestamp: point.timestamp,
+        });
+      }
     }
+
+    // Update journey-level stats in the background
+    await ctx.scheduler.runAfter(0, internal.journeys.mutations.recalculateStatistics, {
+      journeyId: activity.journeyId,
+    });
 
     return activityId;
   },
 });
 
 // =================================================================
-// 3. MARK AS FAILED
-// Called from the client if any step in the process fails.
+// 3. FAIL PROCESSING (PUBLIC WRAPPER)
+// Public wrapper for failProcessing to be called from client
 // =================================================================
-export const failProcessing = mutation({
+export const markProcessingFailed = mutation({
   args: {
     activityId: v.id("activities"),
     error: v.string(),
   },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Get current user to ensure they can update this activity
+    const user = await getCurrentUserOrThrow(ctx);
+
+    // Check if the user owns this activity
+    const activity = await ctx.db.get(args.activityId);
+    if (!activity || activity.userId !== user._id) {
+      throw new Error("Activity not found or access denied");
+    }
+
+    await ctx.db.patch(args.activityId, {
+      processingStatus: "failed",
+      processingError: args.error,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+// =================================================================
+// 4. FAIL PROCESSING (INTERNAL)
+// Called from server-side actions if any step in the process fails.
+// =================================================================
+export const failProcessing = internalMutation({
+  args: {
+    activityId: v.id("activities"),
+    error: v.string(),
+  },
+  returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.patch(args.activityId, {
       processingStatus: "failed",
       processingError: args.error,
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 
 // =================================================================
-// 4. GET ACTIVITIES (REACTIVE QUERY)
+// 5. GET ACTIVITIES (REACTIVE QUERY)
 // The UI component will use this to get a live-updating list.
 // =================================================================
 export const getActivitiesByJourney = query({
   args: { journeyId: v.id("journeys") },
+  returns: v.array(v.any()), // Activity documents from DB
   handler: async (ctx, args) => {
     return await ctx.db
       .query("activities")
@@ -141,6 +213,7 @@ export const getActivitiesByJourney = query({
 // Delete activity
 export const deleteActivity = mutation({
   args: { activityId: v.id("activities") },
+  returns: v.id("activities"),
   handler: async (ctx, args) => {
     const activity = await ctx.db.get(args.activityId);
     if (!activity) throw new Error("Activity not found");
@@ -159,7 +232,7 @@ export const deleteActivity = mutation({
     await ctx.db.delete(args.activityId);
 
     // Update journey stats
-    ctx.runMutation(internal.journeys.mutations.recalculateStatistics, {
+    await ctx.scheduler.runAfter(0, internal.journeys.mutations.recalculateStatistics, {
       journeyId: activity.journeyId,
     });
 

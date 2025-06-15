@@ -1,0 +1,10 @@
+{
+  "envVarPrefix": "CONVEX_",
+  "client": {
+    "output": "convex/_generated/client.js"
+  },
+  "typescript": {
+    "output": "convex/_generated/ts"
+  },
+  "schema": "convex/schema.ts"
+}
